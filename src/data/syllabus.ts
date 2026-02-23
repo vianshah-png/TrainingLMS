@@ -131,7 +131,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'M2-03',
                 title: 'Program Training',
-                content: 'Overview of all BN medical and lifestyle programs. Study the program structures and clinical inclusions.',
+                content: 'Overview of all BN medical and lifestyle programs. Study the program structures and health inclusions.',
                 links: [
                     { label: 'Program Training Recording', url: 'https://us06web.zoom.us/rec/play/LEleYRJJTdk9jVOq1fdRn_-bSxcuczslgg-O4I2BlSLSIJaod7wq2lOYjygnCtzVxS__bNi_HZFMhF-G.ciquqYqkwaewWofq?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2F2eBla490EonzMCtdEFEACKWff_wcSIm7L-Xea2Tjs6YKJtCyCO61C1D7HkOhCEMi.91w22q29HVh6aMvb' },
                     { label: 'BN Programs Guide', url: 'https://drive.google.com/file/d/18SQMmnz4riJ17d--GWEvVuvaLQ9iuzKy/view?usp=sharing' },
@@ -153,7 +153,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'M2-05',
                 title: 'Peer Review',
-                content: 'Conduct a clinical and commercial audit of Balance Nutrition versus market peers.<br/><br/><strong>Objective:</strong> To understand how Balance Nutrition stands against key market competitors in terms of clinical approach, sales pitching, and digital presence.<br/><br/><strong>Instructions:</strong><br/>1. Create Your persona: Using the example below, define your own age, weight and goal for this audit.<br/>2. Select 2 Peer Companies & 2 Peer Dieticians to audit alongside <strong>Balance Nutrition</strong> and <strong>Khyati Rupani</strong>.<br/>3. Conduct the research and fill the audit columns.',
+                content: 'Conduct a commercial and comparative audit of Balance Nutrition versus market peers.<br/><br/><strong>Objective:</strong> To understand how Balance Nutrition stands against key market competitors in terms of approach, sales pitching, and digital presence.<br/><br/><strong>Instructions:</strong><br/>1. Create Your persona: Using the example below, define your own age, weight and goal for this audit.<br/>2. Select 2 Peer Companies & 2 Peer Dieticians to audit alongside <strong>Balance Nutrition</strong> and <strong>Khyati Rupani</strong>.<br/>3. Conduct the research and fill the audit columns.',
                 isAssignment: true,
                 persona: {
                     story: "Example: I am 35 years old, 5'6\" tall, and weigh 230 lbs. I have been overweight for a long time but don’t have any health problems.",
@@ -165,7 +165,7 @@ export const syllabusData: Module[] = [
                     "First Impression call: Evaluate the tone, energy, and professionalism of the very first 'Activation Call'.",
                     "Health Discovery: Did the counselor deep-dive into your medical history and lifestyle, or was it a generic pitch?",
                     "Problem-to-Solution Transition: How effectively did they link your health goals to their specific program features?",
-                    "Program Pitching Quality: Evaluate the clinical confidence and clarity during the program recommendation.",
+                    "Program Pitching Quality: Evaluate the confidence and clarity during the program recommendation.",
                     "Pricing Strategy: How was the pricing introduced? Was there 'Limited Time' pressure or genuine value building?",
                     "Objection Handling: How did they manage your concerns about cost, duration, or previous failed attempts?",
                     "With complete unbiased opinion — which company would you purchase your health program from and why?",
@@ -251,8 +251,8 @@ export const syllabusData: Module[] = [
     {
         id: 'module-4',
         title: 'Module 4: Consultation Training',
-        subtitle: 'Client Engagement & Clinical Mastery',
-        description: 'Learning to pitch programs, engage clients day-to-day, and analyze clinical health journeys.',
+        subtitle: 'Client Engagement & Counselling Mastery',
+        description: 'Learning to pitch programs, engage clients day-to-day, and analyze health journeys.',
         type: 'module',
         progress: 0,
         status: 'Available',
@@ -305,7 +305,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'M4-04',
                 title: 'Schedule Your Mock Call',
-                content: 'Book a 1-on-1 mock consultation call with your clinical lead to verify your training progress.',
+                content: 'Book a 1-on-1 mock consultation call with your training lead to verify your training progress.',
                 isBooking: true,
                 bookingUrl: 'https://calendar.app.google/atYBB4DcqN6MX2V48'
             },
@@ -356,9 +356,9 @@ export const syllabusData: Module[] = [
     // ===== CONTENT BANK / RESOURCE VAULT =====
     {
         id: 'resource-bank',
-        title: 'Clinical Content Bank',
+        title: 'Content Bank',
         subtitle: 'Management Training & Asset Library',
-        description: 'Access the full repository of sales training videos, clinical manuals, and founder protocols.',
+        description: 'Access the full repository of sales training videos, training manuals, and founder protocols.',
         type: 'resource',
         progress: 0,
         status: 'Available',
@@ -440,7 +440,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'RB-01',
                 title: "Khyati Ma'am's Video",
-                content: 'Core clinical philosophy and founder vision address.',
+                content: 'Core training philosophy and founder vision address.',
                 links: [{ label: 'Watch Video', url: '#' }]
             },
             {
@@ -484,7 +484,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'PV-P2-01',
                 title: 'Renue Program',
-                content: 'Phase 2: Skin health and anti-aging clinical protocols.',
+                content: 'Phase 2: Skin health and anti-aging protocols.',
                 links: [{ label: 'Watch Training', url: 'https://youtu.be/FXBqPTEqEVU' }]
             },
             {

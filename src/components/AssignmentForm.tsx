@@ -196,7 +196,7 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                     </div>
                     <div>
                         <h3 className="text-lg font-serif text-[#0E5858]">
-                            {step === 'persona' ? 'Audit Persona' : step === 'define-persona' ? 'Create Your Persona' : step === 'selection' ? 'Audit Selection' : 'Clinical Peer Audit'}
+                            {step === 'persona' ? 'Audit Persona' : step === 'define-persona' ? 'Create Your Persona' : step === 'selection' ? 'Audit Selection' : 'Peer Audit'}
                         </h3>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-tight">
                             {step === 'questions' ? `Audit Point ${currentQuestionIndex + 1} of ${questions.length}` : 'Step-by-step setup'}
@@ -325,7 +325,7 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                                     </h4>
                                 </div>
                                 <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${isDieticianStep ? 'bg-[#00B6C1]/5 text-[#00B6C1] border-[#00B6C1]/20' : 'bg-[#0E5858]/5 text-[#0E5858] border-[#0E5858]/20'}`}>
-                                    {isDieticianStep ? 'Digital Presence Audit' : 'Commercial & Clinical Audit'}
+                                    {isDieticianStep ? 'Digital Presence Audit' : 'Commercial & Comparative Audit'}
                                 </div>
                             </div>
 
@@ -356,7 +356,7 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                                                 });
                                             }}
                                             className="w-full p-5 bg-white border border-gray-100 rounded-[2rem] text-[12px] min-h-[160px] focus:ring-4 focus:ring-[#00B6C1]/5 focus:border-[#00B6C1] outline-none transition-all placeholder:text-gray-200 resize-none leading-relaxed shadow-sm"
-                                            placeholder={`Clinical findings for ${header.brand}...`}
+                                            placeholder={`Findings for ${header.brand}...`}
                                         />
                                     </div>
                                 ))}

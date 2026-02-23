@@ -703,7 +703,7 @@ function AdminDashboardContent() {
                                 </div>
 
                                 <div className="bg-[#0E5858] text-white rounded-[3rem] p-10 shadow-xl space-y-8">
-                                    <h4 className="text-sm font-black uppercase tracking-[0.2em] text-[#00B6C1]">Add Clinical Audit</h4>
+                                    <h4 className="text-sm font-black uppercase tracking-[0.2em] text-[#00B6C1]">Add Audit Report</h4>
                                     <form onSubmit={handleSubmitAudit} className="space-y-4">
                                         <div>
                                             <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Performance Score (0-100)</label>
@@ -716,7 +716,7 @@ function AdminDashboardContent() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Clinical Feedback / Observations</label>
+                                            <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Feedback / Observations</label>
                                             <textarea
                                                 value={auditForm.feedback}
                                                 onChange={e => setAuditForm({ ...auditForm, feedback: e.target.value })}
@@ -817,7 +817,7 @@ function AdminDashboardContent() {
                                 {/* Detailed Progress Map */}
                                 <div className="bg-white p-10 rounded-[3rem] border border-[#0E5858]/5">
                                     <h4 className="text-xs font-black uppercase tracking-widest text-[#0E5858]/40 mb-8 flex items-center gap-3">
-                                        <ClipboardList size={16} className="text-[#00B6C1]" /> Clinical Training Progress Map
+                                        <ClipboardList size={16} className="text-[#00B6C1]" /> Training Progress Map
                                     </h4>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -902,7 +902,7 @@ function AdminDashboardContent() {
                                             </div>
                                         ))}
                                         {audits.filter(a => a.user_id === selectedProfile.id).length === 0 && (
-                                            <p className="text-center py-10 text-[10px] font-black text-gray-300 uppercase tracking-widest">No clinical audits logged yet</p>
+                                            <p className="text-center py-10 text-[10px] font-black text-gray-300 uppercase tracking-widest">No audits logged yet</p>
                                         )}
                                     </div>
                                 </div>
@@ -914,7 +914,7 @@ function AdminDashboardContent() {
                         <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                             <div>
                                 <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight">Counsellor Control Hub</h2>
-                                <p className="text-gray-400 font-medium mt-3 italic">Live monitoring of clinical training throughput.</p>
+                                <p className="text-gray-400 font-medium mt-3 italic">Live monitoring of training progress.</p>
                             </div>
                             <div className="flex gap-4">
                                 <div className="px-6 py-4 bg-white rounded-2xl shadow-sm border border-[#0E5858]/5 text-center min-w-[140px]">
@@ -996,7 +996,7 @@ function AdminDashboardContent() {
                             </div>
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00B6C1] mb-2">Professional Identity</p>
-                                <h2 className="text-3xl font-serif mb-6">Your Clinical Information</h2>
+                                <h2 className="text-3xl font-serif mb-6">Your Contact Information</h2>
 
                                 <div className="flex flex-col md:flex-row gap-6 items-end">
                                     <div className="flex-1 space-y-2">
@@ -1023,7 +1023,7 @@ function AdminDashboardContent() {
 
                         <header className="text-center pt-8">
                             <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight mb-4 text-center">Provision Access</h2>
-                            <p className="text-gray-400 font-medium max-w-md mx-auto italic text-sm">Deploy secure credentials to new clinical team members.</p>
+                            <p className="text-gray-400 font-medium max-w-md mx-auto italic text-sm">Deploy secure credentials to new team members.</p>
                         </header>
 
                         <form onSubmit={handleCreateUser} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-[#0E5858]/5 space-y-8">
@@ -1114,7 +1114,7 @@ function AdminDashboardContent() {
                     <motion.div key="architect" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="space-y-12">
                         <header>
                             <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight">Content Architect</h2>
-                            <p className="text-gray-400 font-medium mt-3 italic text-sm">Synchronize clinical resources across the academy.</p>
+                            <p className="text-gray-400 font-medium mt-3 italic text-sm">Synchronize resources across the academy.</p>
                         </header>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1346,7 +1346,7 @@ function AdminDashboardContent() {
                 )}
             </AnimatePresence>
 
-            {/* Clinical Audit Data Modal */}
+            {/* Audit Data Modal */}
             <AnimatePresence>
                 {selectedAudit && (
                     <div className="fixed inset-0 bg-[#0E5858]/90 backdrop-blur-xl z-[100] flex items-center justify-center p-8 overflow-y-auto">
@@ -1364,7 +1364,7 @@ function AdminDashboardContent() {
                                 </div>
                                 <div>
                                     <h3 className="text-4xl font-serif text-[#0E5858] mb-2">{selectedAudit.topic_code}</h3>
-                                    <p className="text-xs font-bold text-[#00B6C1] uppercase tracking-widest">Comprehensive Clinical Peer Audit Report</p>
+                                    <p className="text-xs font-bold text-[#00B6C1] uppercase tracking-widest">Comprehensive Peer Audit Report</p>
                                 </div>
                             </div>
 
@@ -1401,7 +1401,7 @@ function AdminDashboardContent() {
                                             {/* Comparative Matrix */}
                                             <div className="space-y-6">
                                                 <h4 className="text-xs font-black text-[#0E5858]/40 uppercase tracking-[0.2em] flex items-center gap-3">
-                                                    <BrainCircuit size={16} className="text-[#00B6C1]" /> Comparative Clinical Findings
+                                                    <BrainCircuit size={16} className="text-[#00B6C1]" /> Comparative Findings
                                                 </h4>
 
                                                 <div className="space-y-4">

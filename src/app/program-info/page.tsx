@@ -30,7 +30,7 @@ export default function ProgramInfoPage() {
                     The Balance Nutrition <span className="text-[#00B6C1]">Standard</span>
                 </h1>
                 <p className="text-xl text-gray-500 leading-relaxed italic">
-                    "Expertise in clinical practice, empathy in patient care, and excellence in counselling protocols."
+                    "Expertise in counselling practice, empathy in client care, and excellence in onboarding protocols."
                 </p>
             </header>
 
@@ -38,7 +38,7 @@ export default function ProgramInfoPage() {
                 {[
                     { title: 'Our Mission', text: 'To empower counselors with scientific precision and compassionate counselling skills.', icon: Target },
                     { title: 'Quality Framework', text: 'Every consultation follows the 32-point global nutrition standard verified by BN.', icon: ShieldCheck },
-                    { title: 'Counsellor Growth', text: 'A pathway designed to take you from specialized trainee to Senior Clinical Lead.', icon: Award },
+                    { title: 'Counsellor Growth', text: 'A pathway designed to take you from specialized trainee to Senior Counselling Lead.', icon: Award },
                 ].map((item, i) => (
                     <motion.div key={i} variants={itemVariants} className="premium-card p-10 group">
                         <div className="w-16 h-16 bg-[#0E5858] text-[#00B6C1] rounded-[1.5rem] flex items-center justify-center mb-8 shadow-xl group-hover:rotate-6 transition-all">
@@ -54,13 +54,13 @@ export default function ProgramInfoPage() {
                 <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white opacity-[0.03] rounded-full blur-3xl -mr-[200px] -mt-[200px]"></div>
                 <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
                     <div>
-                        <h2 className="text-4xl lg:text-5xl font-serif mb-8 leading-tight">The Ecosystem of <br /><span className="text-[#00B6C1]">Clinical Success</span></h2>
+                        <h2 className="text-4xl lg:text-5xl font-serif mb-8 leading-tight">The Ecosystem of <br /><span className="text-[#00B6C1]">Success</span></h2>
                         <div className="space-y-8">
                             <div className="flex gap-6">
                                 <div className="shrink-0 w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-[#00B6C1]"><Users size={24} /></div>
                                 <div>
                                     <h4 className="font-bold text-xl mb-2">Counselor Community</h4>
-                                    <p className="text-white/60 font-medium">Join 200+ elite dieticians sharing clinical insights daily.</p>
+                                    <p className="text-white/60 font-medium">Join 200+ elite dieticians sharing industry insights daily.</p>
                                 </div>
                             </div>
                             <div className="flex gap-6">
@@ -80,7 +80,7 @@ export default function ProgramInfoPage() {
                             <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#00B6C1] to-[#0E5858]"></div>
                             <div>
                                 <p className="font-bold">Khyati Rupani</p>
-                                <p className="text-[10px] text-[#00B6C1] font-bold uppercase tracking-widest">Founder & Clinical Lead</p>
+                                <p className="text-[10px] text-[#00B6C1] font-bold uppercase tracking-widest">Founder & Lead</p>
                             </div>
                         </div>
                     </div>

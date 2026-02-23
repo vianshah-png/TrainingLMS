@@ -143,7 +143,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
             {loading && (
                 <div className="flex flex-col items-center justify-center gap-3 p-6 bg-[#FAFCEE] rounded-2xl border border-[#00B6C1]/10 text-center">
                     <Loader2 className="animate-spin text-[#00B6C1]" size={24} />
-                    <p className="text-[10px] font-bold text-[#0E5858]/60 uppercase tracking-widest">Generating Clinical Scenarios...</p>
+                    <p className="text-[10px] font-bold text-[#0E5858]/60 uppercase tracking-widest">Generating Scenarios...</p>
                 </div>
             )}
 
@@ -205,7 +205,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                             <CheckCircle2 size={32} className="text-[#00B6C1]" />
                         </div>
                         <h3 className="text-2xl font-serif text-[#0E5858] mb-2">Audit Complete</h3>
-                        <p className="text-[10px] font-black text-[#00B6C1] mb-6 uppercase tracking-[0.2em]">Clinical Proficiency Logged</p>
+                        <p className="text-[10px] font-black text-[#00B6C1] mb-6 uppercase tracking-[0.2em]">Assessment Logged</p>
 
                         <div className="p-5 bg-white/60 backdrop-blur-sm rounded-2xl text-xs text-gray-500 mb-8 border border-white leading-relaxed">
                             Your Viva performance and score have been securely transmitted to the <strong>Founders Dashboard</strong>. Re-attempts for low scores require administrative override.

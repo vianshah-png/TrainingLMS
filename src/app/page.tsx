@@ -132,7 +132,7 @@ export default function Home() {
             full_name: buddy.name || "BN Admin",
             email: buddy.email || "admin@balancenutrition.in",
             phone: buddy.phone || "0000000000",
-            role: 'Clinical Expert'
+            role: 'Training Mentor'
           }));
         } catch (e) {
           // Fallback for old comma-separated emails
@@ -145,7 +145,7 @@ export default function Home() {
             full_name: m.full_name,
             email: m.email,
             phone: m.phone,
-            role: m.role || 'Clinical Expert'
+            role: m.role || 'Training Mentor'
           }));
         }
       }
@@ -156,7 +156,7 @@ export default function Home() {
           full_name: "BN Admin",
           email: "admin@balancenutrition.in",
           phone: "0000000000",
-          role: "Clinical Expert"
+          role: "Training Mentor"
         }];
       }
 
@@ -236,7 +236,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-3xl font-serif text-[#0E5858]">Welcome back, {userName}</h1>
-                <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em]">clinical proficiency track</p>
+                <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em]">counsellor training track</p>
               </div>
             </div>
           </motion.div>
@@ -292,7 +292,7 @@ export default function Home() {
                   <Sparkles size={12} className="text-[#00B6C1]" />
                   Session Highlight
                 </div>
-                <h2 className="text-5xl lg:text-6xl font-serif mb-6 leading-tight">Master the Art of <br />Clinical Consultation</h2>
+                <h2 className="text-5xl lg:text-6xl font-serif mb-6 leading-tight">Master the Art of <br />Counselling</h2>
                 <button
                   onClick={() => router.push(`/modules/${lastModule?.id || 'module-1'}`)}
                   className="px-8 py-4 bg-[#00B6C1] text-[#0E5858] rounded-2xl font-bold shadow-2xl hover:bg-white transition-all flex items-center gap-3 group/btn"
@@ -377,7 +377,7 @@ export default function Home() {
         <motion.section variants={itemVariants}>
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-2xl font-serif text-[#0E5858]">Expertise Modules</h3>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Self-Paced Clinical Mastery</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Self-Paced Training Modules</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -452,7 +452,7 @@ export default function Home() {
                     <User size={28} />
                   </div>
                   <h3 className="text-4xl font-serif text-[#0E5858]">Training Buddies</h3>
-                  <p className="text-sm text-gray-400 font-medium italic mt-2">Connecting you withclinical experts for guidance.</p>
+                  <p className="text-sm text-gray-400 font-medium italic mt-2">Connecting you with mentors for guidance.</p>
                 </header>
 
                 <div className="space-y-4 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
@@ -478,7 +478,7 @@ export default function Home() {
 
                 <div className="mt-10 pt-8 border-t border-gray-100 flex items-center gap-4 text-gray-400">
                   <Info size={16} />
-                  <p className="text-[10px] font-medium leading-relaxed">Contact your assigned buddy for clinical doubts or protocol clarifications.</p>
+                  <p className="text-[10px] font-medium leading-relaxed">Contact your assigned buddy for training questions or process clarifications.</p>
                 </div>
               </motion.div>
             </div>

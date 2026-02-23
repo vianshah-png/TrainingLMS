@@ -409,7 +409,7 @@ export default function ModulePage() {
                             </div>
 
                             <h2 className="text-4xl font-serif text-[#0E5858] mb-4">Final Audit: Viva Session</h2>
-                            <p className="text-gray-500 font-medium mb-10 italic">"Clinical proficiency check for Phase 1 certification."</p>
+                            <p className="text-gray-500 font-medium mb-10 italic">"Proficiency check for Phase 1 certification."</p>
 
                             <div className="bg-[#FAFCEE] rounded-3xl p-8 text-left mb-10 space-y-4 border border-[#00B6C1]/10">
                                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] mb-2">Audit Rules & Protocols</h4>
@@ -428,7 +428,7 @@ export default function ModulePage() {
                                     </li>
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
-                                        <span>Retest Protocol: Low scores require clinical lead approval for re-attempt.</span>
+                                        <span>Retest Protocol: Low scores require training lead approval for re-attempt.</span>
                                     </li>
                                 </ul>
                             </div>
@@ -469,7 +469,7 @@ export default function ModulePage() {
                             <div className="mb-8">
                                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#00B6C1]/10 text-[#00B6C1] rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
                                     <Activity size={12} />
-                                    Clinical Simulation
+                                    Practice Simulation
                                 </div>
                                 <h2 className="text-4xl font-serif text-[#0E5858] mb-2">Protocol Viva Simulation</h2>
                                 <p className="text-gray-500 font-medium">Practice your consultation pitch with our AI client before the final module check.</p>
@@ -523,7 +523,7 @@ export default function ModulePage() {
                                     Module Certification
                                 </div>
                                 <h2 className="text-4xl font-serif text-[#0E5858] mb-2">{baseModule.title} Check</h2>
-                                <p className="text-gray-500 font-medium">Verify your clinical knowledge before proceeding to the next segment.</p>
+                                <p className="text-gray-500 font-medium">Verify your knowledge before proceeding to the next segment.</p>
                             </div>
 
                             <AIAssessment
@@ -570,7 +570,7 @@ export default function ModulePage() {
                                     BN Health Ecosystem
                                 </div>
                                 <h2 className="text-4xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
-                                <p className="text-gray-500 font-medium italic">"Integrated clinical support for optimized patient results."</p>
+                                <p className="text-gray-500 font-medium italic">"Integrated support for optimized client results."</p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -605,7 +605,7 @@ export default function ModulePage() {
                                 </a>
                             </div>
 
-                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized clinical protocols</p>
+                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized protocols</p>
                         </motion.div>
                     </motion.div>
                 )}
@@ -617,7 +617,7 @@ export default function ModulePage() {
                         <img src="/assets/BN_Logo-BlueBG-Square-HD.png" alt="BN" className="w-full h-full object-contain rounded-xl shadow-lg" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-[0.2em]">Clinical Protocol Hub</span>
+                        <span className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-[0.2em]">Resource Hub</span>
                         <span className="text-lg font-serif">Balance Nutrition</span>
                     </div>
                 </Link>
@@ -741,7 +741,7 @@ export default function ModulePage() {
                             <BookOpen size={40} className="relative z-10" />
                         </div>
                         <h2 className="text-4xl font-serif text-[#0E5858] mb-4">Curriculum Mapping</h2>
-                        <p className="text-gray-400 max-w-sm mb-12 text-lg">Detailed educational paths and clinical simulations are coming soon to this module.</p>
+                        <p className="text-gray-400 max-w-sm mb-12 text-lg">Detailed educational paths and practice simulations are coming soon to this module.</p>
                         <button className="px-12 py-4 bg-[#0E5858] text-white rounded-[1.5rem] font-bold shadow-2xl hover:bg-black transition-all">Mark as Review Ready</button>
                     </div>
                 )}
@@ -831,13 +831,13 @@ export default function ModulePage() {
                             </div>
                             <h2 className={`text-4xl lg:text-5xl font-serif mb-4 leading-tight ${assessmentPassed ? 'text-[#0E5858]' : 'text-white'}`}>
                                 {assessmentPassed
-                                    ? <span>Clinical Proficiency <br /><span className="text-[#00B6C1]">Verified</span></span>
+                                    ? <span>Training Proficiency <br /><span className="text-[#00B6C1]">Verified</span></span>
                                     : <span>Final Module <br /><span className="text-[#00B6C1]">Assessment</span></span>
                                 }
                             </h2>
                             <p className={`text-lg font-medium max-w-xl ${assessmentPassed ? 'text-gray-500' : 'text-white/60 text-base'}`}>
                                 {assessmentPassed
-                                    ? "Your understanding of this clinical block has been verified. You are now officially cleared to proceed to the next module."
+                                    ? "Your understanding of this training block has been verified. You are now officially cleared to proceed to the next module."
                                     : "You've successfully covered all sections! Now, demonstrate your clinical mastery by taking the final module quiz."
                                 }
                             </p>

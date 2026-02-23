@@ -159,7 +159,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                         <div className="flex justify-between items-center mb-8">
                             <div>
                                 <h3 className="text-3xl font-serif text-white mb-1">Case Study Analysis</h3>
-                                <p className="text-[#00B6C1] text-xs font-bold uppercase tracking-widest">Clinical Protocol Deep Dive</p>
+                                <p className="text-[#00B6C1] text-xs font-bold uppercase tracking-widest">Service Overview</p>
                             </div>
                             <button
                                 onClick={() => setSelectedCaseStudy(null)}
@@ -202,7 +202,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                     BN Health Ecosystem
                                 </div>
                                 <h2 className="text-4xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
-                                <p className="text-gray-500 font-medium italic">"Integrated clinical support for optimized patient results."</p>
+                                <p className="text-gray-500 font-medium italic">"Integrated support for optimized client results."</p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -237,7 +237,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 </a>
                             </div>
 
-                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized clinical protocols</p>
+                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized protocols</p>
                         </motion.div>
                     </motion.div>
                 )}
@@ -457,7 +457,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 </div>
                             )}
 
-                            {/* Case Study Grid OR Video/Mark as Read OR Assignment Resources OR Clinical Booking */}
+                            {/* Case Study Grid OR Video/Mark as Read OR Assignment Resources OR Practice Booking */}
                             {topic.isBooking ? (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                                     <div className="flex items-center gap-4 mb-2">
@@ -500,7 +500,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         <BrainCircuit size={32} className="text-white animate-pulse" />
                                     </div>
                                     <h3 className="text-2xl font-serif text-white mb-2">Ready for Performance Audit?</h3>
-                                    <p className="text-white/60 text-sm mb-8 max-w-md mx-auto">Use the peer resource links above to gather your data, then click below to initialize your clinical audit matrix.</p>
+                                    <p className="text-white/60 text-sm mb-8 max-w-md mx-auto">Use the peer resource links above to gather your data, then click below to initialize your audit matrix.</p>
                                     <button
                                         onClick={() => {
                                             setVideoCompleted(true);
@@ -573,7 +573,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             {topic.hasLive ? <User size={20} /> : <Activity size={20} />}
                                         </div>
                                         <div>
-                                            <h4 className="text-lg font-serif text-[#0E5858]">{topic.hasLive ? 'Clinical Protocol Simulation' : 'Analytical Research Task'}</h4>
+                                            <h4 className="text-lg font-serif text-[#0E5858]">{topic.hasLive ? 'Practice Simulation' : 'Analytical Research Task'}</h4>
                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Practical Implementation Phase</p>
                                         </div>
                                     </div>

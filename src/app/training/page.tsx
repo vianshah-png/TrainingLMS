@@ -31,7 +31,7 @@ export default function TrainingPage() {
             <header className="mb-16">
                 <h1 className="text-5xl font-serif text-[#0E5858] mb-4">Counselor Training Academy</h1>
                 <p className="text-xl text-gray-500 max-w-2xl">
-                    Complete the following modules to master the Balance Nutrition clinical protocols and counselling standards.
+                    Complete the following modules to master the Balance Nutrition counselling standards and onboarding processes.
                 </p>
             </header>
 
