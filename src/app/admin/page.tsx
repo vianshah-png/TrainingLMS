@@ -231,7 +231,7 @@ function AdminDashboardContent() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Provisioning failed');
 
-            setUserSuccess(`Authorized: ${newUser.email}. Verification email queued.`);
+            setUserSuccess(`Authorized: ${newUser.email}. Account created and ready for use.`);
             setNewUser({ email: "", password: "", fullName: "", role: "counsellor", trainingBuddy: "" });
             refreshData();
         } catch (err: any) {

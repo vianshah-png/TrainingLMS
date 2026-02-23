@@ -1,29 +1,22 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function POST(request: Request) {
-
-    // Server-side admin check
-    const auth = await verifyAdmin(request);
-    if (!auth.authorized) return auth.response;
-
     try {
-        const { email, password, fullName, role, trainingBuddy } = await request.json();
+        const { email, password, fullName } = await request.json();
 
         if (!email || !password || !fullName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // 1. Create the user in Supabase Auth
+        // 1. Create the user in Supabase Auth with auto-confirm
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
             email_confirm: true,
             user_metadata: {
                 full_name: fullName,
-                role: role || 'counsellor',
-                training_buddy: trainingBuddy || ''
+                role: 'counsellor'
             }
         });
 
@@ -41,22 +34,19 @@ export async function POST(request: Request) {
                     id: userId,
                     email,
                     full_name: fullName,
-                    role: role || 'counsellor',
-                    training_buddy: trainingBuddy || '',
-                    temp_password: password,
-                    updated_at: new Date().toISOString()
+                    role: 'counsellor',
+                    created_at: new Date().toISOString()
                 });
 
             if (profileError) {
-                // If column doesn't exist, we'll log it but not fail the creation
-                console.warn('Profile enrichment warning (column might be missing):', profileError.message);
+                console.warn('Profile creation warning:', profileError.message);
             }
 
             // 3. Initialize progress tracking activity
             await supabaseAdmin.from('mentor_activity_logs').insert([{
                 user_id: userId,
                 activity_type: 'signup',
-                content_title: 'Account Provisioned by Admin',
+                content_title: 'Account Created',
                 module_id: 'System'
             }]);
         }

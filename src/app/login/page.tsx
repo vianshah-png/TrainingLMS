@@ -60,25 +60,31 @@ export default function LoginPage() {
             return;
         }
 
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName.trim(),
-                    role: selectedRole
-                }
-            }
-        });
+        try {
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    fullName: fullName.trim()
+                }),
+            });
 
-        if (error) {
-            setError(error.message);
-        } else {
-            setSuccess("Account created successfully! You can now log in.");
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Signup failed');
+            }
+
+            setSuccess("Account created successfully! You can now log in without email verification.");
             setMode('login');
             setPassword("");
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const enterForm = (role: 'interviewee' | 'admin') => {

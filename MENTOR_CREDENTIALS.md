@@ -6,16 +6,16 @@ This document contains all the test credentials for the Balance Nutrition Mentor
 *   **System URL**: `http://localhost:3000/founder` (Required to be logged in first)
 *   **Master Password**: `515148`
 
-### **Mentor Test Accounts**
+### **Counsellor Test Accounts**
 All accounts use the same universal password for testing convenience.
 
 **Universal Password**: `515148`
 
-| Mentor Name | Email Address | 
+| Counsellor Name | Email Address | 
 | :--- | :--- |
 | **Anjali Mehta** | `anjali.m@balancenutrition.in` |
 | **Rahul Sharma** | `rahul.s@balancenutrition.in` |
-| **Priya Kapoor** | `priya.k@balancenutrition.in` |
+| **Shivani** | `priya.k@balancenutrition.in` |
 | **Vikram Joshi** | `vikram.j@balancenutrition.in` |
 | **Sneha Reddy** | `sneha.r@balancenutrition.in` |
 | **Amit Verma** | `amit.v@balancenutrition.in` |
