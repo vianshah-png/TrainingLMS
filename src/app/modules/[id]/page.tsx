@@ -285,6 +285,7 @@ export default function ModulePage() {
 
             if (!error) {
                 setCompletedTopics([...completedTopics, topicCode]);
+                logActivity('complete_quiz', { topicCode, moduleId });
             } else {
                 console.error("Failed to mark topic complete:", error.message);
                 // Fallback: try upsert if insert failed (maybe it was created in the millisecond since check)
@@ -300,9 +301,10 @@ export default function ModulePage() {
         }
     };
 
-    const currentModuleIndex = syllabusData.findIndex(m => m.id === moduleId);
-    const prevModule = syllabusData[currentModuleIndex - 1];
-    const nextModule = syllabusData[currentModuleIndex + 1];
+    const visibleSyllabus = syllabusData.filter(m => m.id !== 'resource-bank');
+    const currentModuleIndex = visibleSyllabus.findIndex(m => m.id === moduleId);
+    const prevModule = visibleSyllabus[currentModuleIndex - 1];
+    const nextModule = visibleSyllabus[currentModuleIndex + 1];
 
     const handlePrev = () => {
         if (prevModule) {
@@ -334,11 +336,15 @@ export default function ModulePage() {
                 return;
             }
 
-            if (!assessmentPassed) {
-                if (moduleId === 'module-2') {
-                    setShowVivaIntro(true);
+            if (moduleId === 'module-2') {
+                if (currentCompleted.includes('M2-05')) {
+                    if (!assessmentPassed) {
+                        setShowVivaIntro(true);
+                    } else if (nextModule) {
+                        router.push(`/modules/${nextModule.id}`);
+                    }
                 } else {
-                    setShowModuleAssessment(true);
+                    alert("Please submit your Peer Review report (M2-05) before taking the final audit.");
                 }
             } else if (nextModule) {
                 router.push(`/modules/${nextModule.id}`);
@@ -816,7 +822,7 @@ export default function ModulePage() {
                     initial={{ opacity: 0, y: 40 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className={`mt-12 p-8 lg:p-12 rounded-[3.5rem] border-2 transition-all duration-1000 relative overflow-hidden group ${assessmentPassed
+                    className={`mt-12 p-8 lg:p-12 rounded-[3.5rem] border-2 transition-all duration-1000 relative overflow-hidden group ${assessmentPassed || moduleId !== 'module-2'
                         ? 'bg-[#FAFCEE] border-[#0E5858]/10'
                         : 'bg-[#0E5858] border-[#0E5858] shadow-3xl shadow-[#0E5858]/30'
                         }`}
@@ -824,46 +830,61 @@ export default function ModulePage() {
                     <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-48 -mt-48"></div>
                     <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
                         <div className="flex-1">
-                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-6 ${assessmentPassed ? 'bg-green-100 text-green-700' : 'bg-[#00B6C1]/20 text-[#00B6C1]'
+                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-6 ${assessmentPassed || moduleId !== 'module-2' ? 'bg-green-100 text-green-700' : 'bg-[#00B6C1]/20 text-[#00B6C1]'
                                 }`}>
-                                {assessmentPassed ? <CheckCircle2 size={12} /> : <Brain size={12} />}
-                                {assessmentPassed ? 'Assessment Mastered' : 'Achievement Unlocked'}
+                                {assessmentPassed || moduleId !== 'module-2' ? <CheckCircle2 size={12} /> : <Brain size={12} />}
+                                {moduleId === 'module-2' ? (assessmentPassed ? 'Audit Mastered' : 'Achievement Unlocked') : 'Section Completed'}
                             </div>
-                            <h2 className={`text-4xl lg:text-5xl font-serif mb-4 leading-tight ${assessmentPassed ? 'text-[#0E5858]' : 'text-white'}`}>
-                                {assessmentPassed
-                                    ? <span>Training Proficiency <br /><span className="text-[#00B6C1]">Verified</span></span>
-                                    : <span>Final Module <br /><span className="text-[#00B6C1]">Assessment</span></span>
+                            <h2 className={`text-4xl lg:text-5xl font-serif mb-4 leading-tight ${assessmentPassed || moduleId !== 'module-2' ? 'text-[#0E5858]' : 'text-white'}`}>
+                                {moduleId === 'module-2'
+                                    ? (assessmentPassed ? "Verification complete." : "Final Module Assessment")
+                                    : "Module Achievement Unlocked"
                                 }
                             </h2>
-                            <p className={`text-lg font-medium max-w-xl ${assessmentPassed ? 'text-gray-500' : 'text-white/60 text-base'}`}>
-                                {assessmentPassed
-                                    ? "Your understanding of this training block has been verified. You are now officially cleared to proceed to the next module."
-                                    : "You've successfully covered all sections! Now, demonstrate your clinical mastery by taking the final module quiz."
+                            <p className={`text-lg font-medium max-w-xl ${assessmentPassed || moduleId !== 'module-2' ? 'text-gray-500' : 'text-white/60 text-base'}`}>
+                                {moduleId === 'module-2'
+                                    ? (assessmentPassed ? "Your understanding of this training block has been verified." : "Demonstrate your clinical mastery by taking the final module quiz.")
+                                    : "Great job! You've successfully covered all sections of this module. You're now ready to move forward."
                                 }
                             </p>
                         </div>
-                        <div className="shrink-0">
-                            {assessmentPassed ? (
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center text-white shadow-2xl relative">
-                                        <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-20"></div>
-                                        <Award size={40} />
+                        <div className="shrink-0 relative z-10">
+                            {moduleId === 'module-2' ? (
+                                assessmentPassed ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center text-white shadow-2xl relative">
+                                            <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-20"></div>
+                                            <Award size={40} />
+                                        </div>
+                                        {nextModule && <button onClick={() => router.push(`/modules/${nextModule.id}`)} className="text-xs font-black text-[#00B6C1] uppercase tracking-widest hover:underline">Next Module</button>}
                                     </div>
-                                    <span className="text-xs font-black text-green-600 uppercase tracking-widest">Score Captured</span>
-                                </div>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            if (!completedTopics.includes('M2-05')) {
+                                                alert("Please complete the Peer Review (M2-05) first.");
+                                                return;
+                                            }
+                                            setShowVivaIntro(true);
+                                        }}
+                                        className="px-12 py-6 bg-[#00B6C1] text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-white hover:text-[#0E5858] transition-all hover:-translate-y-2 group"
+                                    >
+                                        <span className="flex items-center gap-4">
+                                            Initialize Audit
+                                            <ChevronRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                                        </span>
+                                    </button>
+                                )
                             ) : (
                                 <button
                                     onClick={() => {
-                                        if (moduleId === 'module-2') setShowVivaIntro(true);
-                                        else if (moduleId === 'module-4' && !simulationDone) setShowSimulation(true);
-                                        else setShowModuleAssessment(true);
+                                        if (moduleId === 'module-4' && !simulationDone) setShowSimulation(true);
+                                        else if (nextModule) router.push(`/modules/${nextModule.id}`);
+                                        else router.push('/');
                                     }}
-                                    className="px-12 py-6 bg-[#00B6C1] text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-white hover:text-[#0E5858] transition-all hover:-translate-y-2 group"
+                                    className="px-12 py-6 bg-white text-[#0E5858] border border-[#0E5858]/10 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-[#0E5858] hover:text-white transition-all transform hover:scale-105"
                                 >
-                                    <span className="flex items-center gap-4">
-                                        Initialize Audit
-                                        <ChevronRight size={18} className="group-hover:translate-x-2 transition-transform" />
-                                    </span>
+                                    {moduleId === 'module-4' && !simulationDone ? "Start Simulation" : (nextModule ? "Next Module" : "Return to Hub")}
                                 </button>
                             )}
                         </div>
@@ -880,12 +901,14 @@ export default function ModulePage() {
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Cross-Platform Resource Deep Links</p>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                         {[
                             { title: "BN Shop", url: "https://www.balancenutrition.in/shop", desc: "E-Commerce & Product Inventory", icon: ShoppingBag, color: "#FFCC00" },
                             { title: "Nutripreneur", url: "https://nutripreneur.balancenutrition.in/", desc: "Entrepreneurial Learning Platform", icon: Target, color: "#00B6C1" },
                             { title: "BN Franchise", url: "https://bnlifecentre.balancenutrition.in/#", desc: "Life Centre & Franchise Operations", icon: Globe, color: "#0E5858" },
-                            { title: "BN Health", url: "#", desc: "Diagnostics & Doctors Network", icon: Activity, color: "#FF5733", isPopup: true }
+                            { title: "BN Health", url: "#", desc: "Diagnostics & Doctors Network", icon: Activity, color: "#FF5733", isPopup: true },
+                            { title: "Corporate Wellness", url: "https://drive.google.com/file/d/1YC6Yoz4NSgTsMr65hkc4fHtKApPI3xgM/view?usp=drive_link", desc: "Enterprise Health Partnerships", icon: Building2, color: "#8E44AD" },
+                            { title: "Educational Institute", url: "https://drive.google.com/drive/folders/18NQXel0C-rHSOX9TdTo20liyE67jjz-5?usp=sharing", desc: "Student & Academic Health Programs", icon: School, color: "#27AE60" }
                         ].map((link, i) => (
                             <motion.a
                                 key={i} href={link.url} target={link.isPopup ? undefined : "_blank"}

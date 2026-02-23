@@ -78,7 +78,7 @@ export const syllabusData: Module[] = [
                 links: [
                     { label: 'Meet Founders', url: 'https://www.balancenutrition.in/aboutus' },
                     { label: 'Khyati Journey', url: 'https://yourstory.com/2017/12/youngest-chief-nutritionist-india-helping-10000-people-battle-weight-issues-email-meet-khyati-rupani' },
-                    { label: 'Youtube series', url: 'https://www.youtube.com/watch?v=v8eD_P6E7D0&list=PLiNqWVAAuQ1FwiQKRMtGCMXy1kIYdjlig' }
+                    { label: 'Youtube series', url: 'https://www.youtube.com/@BalanceNutrition/playlists' }
                 ]
             },
             {
@@ -215,32 +215,41 @@ export const syllabusData: Module[] = [
                 ]
             },
             {
-                code: 'M3-01',
-                title: 'Sales Mastery: Phase 1',
+                code: 'M3-02',
+                title: 'Founders Sales Mastery: Phase 1',
                 content: 'Introduction to sales protocols, mock consultations, and foundational structures.',
                 links: [
-                    { label: 'Sales Training Part 1', url: 'https://youtu.be/gYvr-Fdb9z4' },
+                    { label: 'Sales Training Part 1', url: 'https://drive.google.com/file/d/198AmX7QN9dBySnKeNPptKykwj1uCFlz8/view?usp=sharing' },
+
+                ]
+            },
+            {
+                code: 'M3-03',
+                title: 'Founders Sales Mastery Phase 2',
+                content: 'Introduction to sales protocols, mock consultations, and foundational structures.',
+                links: [
+                    { label: 'Sales Training Part 1', url: 'https://www.youtube.com/watch?v=gYvr-Fdb9z4' },
                     { label: 'Sales Training Part 2', url: 'https://youtu.be/DlZCZRNHZfc' },
                     { label: 'Sales Training Part 3', url: 'https://youtu.be/lmRXwJgQOqk' }
                 ]
             },
             {
-                code: 'M3-02',
-                title: 'Sales Mastery: Phase 2',
+                code: 'M3-04',
+                title: 'Founders Sales Mastery Phase 3',
                 content: 'Performance reviews, advanced mock calls, and founder-led consultation techniques.',
                 links: [
-                    { label: 'Sales Training Part 4', url: 'https://youtu.be/L9xqZVVkZs8' },
-                    { label: 'Sales Training Part 5', url: 'https://youtu.be/g6OzGs9McRA' },
-                    { label: 'Sales Training Part 6', url: 'https://youtu.be/X2oH36s6w_E' }
+                    { label: 'Sales Training Part 4', url: 'https://youtu.be/L9xqZVVkZs' },
+                    { label: 'Sales Training Part 5', url: 'https://youtu.be/X2oH36s6w_E' },
+                    { label: 'Sales Training Part 6', url: 'https://youtu.be/W2FKSOOA6' }
                 ]
             },
             {
-                code: 'M3-03',
-                title: 'Sales Mastery: Phase 3',
+                code: 'M3-05',
+                title: 'Founders Sales Mastery Phase 4',
                 content: 'Handling objections, client feedback management, and old client call analysis.',
                 links: [
                     { label: 'Sales Training Part 7', url: 'https://youtu.be/e_WOl6UuWMg' },
-                    { label: 'Sales Training Part 8', url: 'https://youtu.be/W2FKSOOA600' }
+                    { label: 'Sales Training Part 8', url: 'https://www.youtube.com/watch?v=g6OzGs9McRA' }
                 ]
             },
 
@@ -270,7 +279,7 @@ export const syllabusData: Module[] = [
             },
 
             {
-                code: 'M4-03',
+                code: 'M4-02',
                 title: 'Day-to-Day Lead Engagement',
                 content: 'Strategies for daily client engagement, motivation, and milestone tracking.',
                 links: [
@@ -278,7 +287,7 @@ export const syllabusData: Module[] = [
                 ]
             },
             {
-                code: 'M4-02',
+                code: 'M4-03',
                 title: 'Case Studies',
                 content: 'Analyze specific client cases and their health journeys.',
                 links: [
@@ -301,9 +310,18 @@ export const syllabusData: Module[] = [
                     "https://docs.google.com/presentation/d/1e8RI6bUG3lUmkHHhIj4wP-0FT6KJDcay/",
                 ]
             },
-
             {
                 code: 'M4-04',
+                title: 'Inbody BCA training video',
+                content: 'Go through Inbody BCA training video',
+                links: [
+                    { label: 'Inbody BCA training video part 1', url: 'https://balancenutrition.in/media/bca/BCA1.mp4' },
+                    { label: 'Inbody BCA training video part 2', url: 'https://balancenutrition.in/media/bca/BCA.mp4' }
+                ]
+            },
+
+            {
+                code: 'M4-05',
                 title: 'Schedule Your Mock Call',
                 content: 'Book a 1-on-1 mock consultation call with your training lead to verify your training progress.',
                 isBooking: true,
@@ -330,7 +348,7 @@ export const syllabusData: Module[] = [
                 content: 'Experience the primary dashboard interface. Learn to navigate between active clients, pending assessments, and lead queues.',
                 outcome: 'Navigate the counselor ecosystem with 100% efficiency.',
                 links: [
-                    { label: 'Dashboard Zoom Training', url: 'https://us06web.zoom.us/rec/share/YYZegf70CLl_i0uZkDsged9FbRJqU78GOB4iGNCfTjXgQwNuU5e9UTaov6w1BwSt.hjQaGMo8uoG722M5' },
+                    { label: 'Dashboard Zoom Training', url: 'https://drive.google.com/file/d/15uCOJerhQPSOm0-mT7v69nwwYI--hvFP/view?usp=sharing' },
                     { label: 'Explore Dashboard', url: 'https://mentor.balancenutrition.in/mentor-dashboard' }
                 ]
             },

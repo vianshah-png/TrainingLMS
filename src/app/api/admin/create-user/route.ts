@@ -33,23 +33,33 @@ export async function POST(request: Request) {
 
         const userId = authData.user?.id;
 
-        // 2. Create the profile in the profiles table
+        // 2. Create or update the profile in the profiles table
         if (userId) {
+            // Using a more robust upsert approach
+            const profileData: any = {
+                id: userId,
+                email,
+                full_name: fullName,
+                role: role || 'counsellor',
+                // Fallback to empty array string if trainingBuddy is missing, 
+                // as '' is invalid for JSONB columns
+                training_buddy: trainingBuddy || '[]',
+                temp_password: password
+            };
+
+            // Only add phone if it's provided to avoid issues with missing columns or constraints
+            if (phone) profileData.phone = phone;
+
             const { error: profileError } = await supabaseAdmin
                 .from('profiles')
-                .upsert({
-                    id: userId,
-                    email,
-                    full_name: fullName,
-                    role: role || 'counsellor',
-                    training_buddy: trainingBuddy || '',
-                    temp_password: password,
-                    phone: phone || null
-                });
+                .upsert(profileData);
 
             if (profileError) {
-                console.error('Profile creation error:', profileError);
-                return NextResponse.json({ error: 'Auth user created but profile synchronization failed.' }, { status: 500 });
+                console.error('Profile synchronization error:', profileError);
+                return NextResponse.json({
+                    error: `Auth user created but profile synchronization failed: ${profileError.message}`,
+                    details: profileError
+                }, { status: 500 });
             }
 
             // 3. Initialize progress tracking activity

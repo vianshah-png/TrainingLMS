@@ -88,7 +88,7 @@ export default function Home() {
       const dynamicArray = dynContent || [];
 
       // Calculate which modules are done based on syllabus (static) + dynamic topics
-      syllabusData.forEach(module => {
+      syllabusData.filter(m => m.id !== 'resource-bank').forEach(module => {
         const dynamicForModule = dynamicArray.filter(d => d.module_id === module.id);
 
         const staticTopicsDone = module.topics.every(t => completedTopicCodes.has(t.code));
@@ -104,10 +104,14 @@ export default function Home() {
       setCompletedModules(dbCompletedModules);
 
       // Total Topics = Static Syllabus + Dynamic Content
-      const totalStaticTopics = syllabusData.reduce((acc, m) => acc + m.topics.length, 0);
+      const totalStaticTopics = syllabusData
+        .filter(m => m.id !== 'resource-bank')
+        .reduce((acc, m) => acc + m.topics.length, 0);
       const totalTopics = totalStaticTopics + dynamicCount;
 
-      const compositeProgress = totalTopics > 0 ? Math.round((completedTopicCodes.size / totalTopics) * 100) : 0;
+      const validCodesSet = new Set(syllabusData.filter(m => m.id !== 'resource-bank').flatMap(m => m.topics.map(t => t.code)));
+      const filteredCompletedCount = Array.from(completedTopicCodes).filter(code => validCodesSet.has(code)).length;
+      const compositeProgress = totalTopics > 0 ? Math.round((filteredCompletedCount / totalTopics) * 100) : 0;
 
       if (assessments && assessments.length > 0) {
         const avgScore = Math.round((assessments.reduce((acc: number, curr: any) => acc + (curr.score / curr.total_questions), 0) / assessments.length) * 100);
@@ -309,7 +313,7 @@ export default function Home() {
                     <h3 className="text-4xl font-serif">{userStats.progress}%</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest">{completedModules.length}/{syllabusData.length} Modules</p>
+                    <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest">{completedModules.length}/{syllabusData.filter(m => m.id !== 'resource-bank').length} Modules</p>
                   </div>
                 </div>
                 <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-8">
@@ -381,7 +385,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {syllabusData.map((module, index) => {
+            {syllabusData.filter(m => m.id !== 'resource-bank').map((module, index) => {
               const isCompleted = completedModules.includes(module.id);
               return (
                 <motion.div

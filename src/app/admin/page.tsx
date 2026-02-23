@@ -59,6 +59,7 @@ interface Profile {
     training_buddy?: string;
     last_login?: string;
     temp_password?: string;
+    phone?: string;
 }
 
 interface AssessmentRecord {
@@ -92,7 +93,9 @@ interface SummaryAudit {
     created_at: string;
 }
 
-const TOTAL_SYLLABUS_TOPICS = syllabusData.reduce((acc, mod) => acc + mod.topics.length, 0);
+const TOTAL_SYLLABUS_TOPICS = syllabusData
+    .filter(m => m.id !== 'resource-bank')
+    .reduce((acc, mod) => acc + mod.topics.length, 0);
 
 interface DynamicContent {
     id: string;
@@ -249,11 +252,11 @@ function AdminDashboardContent() {
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            const buddyInfo = JSON.stringify({
+            const buddyInfo = JSON.stringify([{
                 name: newUser.buddyName || "BN Admin",
                 email: newUser.buddyEmail || "admin@balancenutrition.in",
                 phone: newUser.buddyPhone || "0000000000"
-            });
+            }]);
 
             const response = await fetch('/api/admin/create-user', {
                 method: 'POST',
@@ -491,9 +494,10 @@ function AdminDashboardContent() {
                                     <div className="space-y-4 border-t border-gray-50 pt-8">
                                         <div className="bg-[#FAFCEE] p-4 rounded-2xl border border-[#0E5858]/5 text-center mb-4">
                                             {(() => {
-                                                const userProgress = progress.filter(pr => pr.user_id === selectedProfile.id);
+                                                const validTopicCodes = new Set(syllabusData.filter(m => m.id !== 'resource-bank').flatMap(m => m.topics.map(t => t.code)));
+                                                const userProgressCount = progress.filter(pr => pr.user_id === selectedProfile.id && validTopicCodes.has(pr.topic_code)).length;
                                                 const userActivity = activity.filter(a => a.user_id === selectedProfile.id);
-                                                const globalPercent = Math.min(100, Math.round((userProgress.length / (TOTAL_SYLLABUS_TOPICS || 1)) * 100));
+                                                const globalPercent = Math.min(100, Math.round((userProgressCount / (TOTAL_SYLLABUS_TOPICS || 1)) * 100));
                                                 const lastAct = userActivity[0];
 
                                                 return (
@@ -738,8 +742,8 @@ function AdminDashboardContent() {
                             {/* Main Detail Area */}
                             <div className="flex-1 space-y-10">
                                 {/* Activity Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-8 rounded-[2.5rem] border border-[#0E5858]/5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                    <div className="bg-white p-8 rounded-[2.5rem] border border-[#0E5858]/5 h-full">
                                         <h4 className="text-xs font-black uppercase tracking-widest text-[#0E5858]/40 mb-6 flex items-center gap-3">
                                             <Monitor size={16} className="text-[#00B6C1]" /> Recent Activity Trail
                                         </h4>
@@ -756,7 +760,7 @@ function AdminDashboardContent() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white p-8 rounded-[2.5rem] border border-[#0E5858]/5">
+                                    <div className="bg-white p-8 rounded-[2.5rem] border border-[#0E5858]/5 h-full">
                                         <h4 className="text-xs font-black uppercase tracking-widest text-[#0E5858]/40 mb-6 flex items-center gap-3">
                                             <Brain size={16} className="text-[#00B6C1]" /> Assessment History
                                         </h4>
@@ -779,20 +783,6 @@ function AdminDashboardContent() {
                                                             className="px-4 py-2 bg-white border border-[#00B6C1]/20 rounded-xl text-[9px] font-black text-[#00B6C1] uppercase tracking-widest hover:bg-[#00B6C1] hover:text-white transition-all shadow-sm"
                                                         >
                                                             Review Quiz
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const matchingAudit = audits.find(a => a.user_id === selectedProfile.id && a.topic_code === quiz.topic_code);
-                                                                if (matchingAudit) {
-                                                                    setSelectedAudit(matchingAudit);
-                                                                } else {
-                                                                    alert("No peer audit found for this assessment.");
-                                                                }
-                                                            }}
-                                                            className="px-4 py-2 bg-white border border-[#FFCC00]/50 rounded-xl text-[9px] font-black text-[#FFCC00] uppercase tracking-widest hover:bg-[#FFCC00] hover:text-[#0E5858] transition-all shadow-sm"
-                                                        >
-                                                            Review Peer Audit
                                                         </button>
                                                         <button
                                                             onClick={(e) => handleGiveRetest(quiz.id, e)}
@@ -821,7 +811,7 @@ function AdminDashboardContent() {
                                     </h4>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        {syllabusData.map(module => {
+                                        {syllabusData.filter(m => m.id !== 'resource-bank').map(module => {
                                             const dynamicForModule = dynamicContent.filter(d => d.module_id === module.id);
                                             const moduleProgress = progress.filter(p => p.user_id === selectedProfile.id && p.module_id === module.id);
                                             const totalTopics = module.topics.length + dynamicForModule.length;
@@ -913,7 +903,6 @@ function AdminDashboardContent() {
                     <motion.div key="hub" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-12">
                         <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                             <div>
-                                <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight">Counsellor Control Hub</h2>
                                 <p className="text-gray-400 font-medium mt-3 italic">Live monitoring of training progress.</p>
                             </div>
                             <div className="flex gap-4">
@@ -1118,57 +1107,16 @@ function AdminDashboardContent() {
                         </header>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <form onSubmit={handleUpdateContent} className="bg-white p-8 rounded-[2rem] shadow-sm border border-[#0E5858]/5 space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-3">Module</label>
-                                    <select
-                                        value={contentForm.moduleId}
-                                        onChange={e => setContentForm({ ...contentForm, moduleId: e.target.value })}
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                        required
-                                    >
-                                        <option value="">Select Target</option>
-                                        {syllabusData.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
-                                    </select>
+                            <div className="bg-[#FAFCEE] p-10 rounded-[2rem] shadow-sm border border-[#0E5858]/10 flex flex-col items-center justify-center text-center space-y-4">
+                                <ShieldCheck size={48} className="text-[#00B6C1]/40" />
+                                <div>
+                                    <h3 className="text-xl font-serif text-[#0E5858]">Content Upload: Phase 2</h3>
+                                    <p className="text-xs text-gray-500 font-medium leading-relaxed max-w-[250px] mt-2">
+                                        Dynamic syllabus updates and resource injection are scheduled for the next major release.
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input
-                                        type="text"
-                                        value={contentForm.topicTitle}
-                                        onChange={e => setContentForm({ ...contentForm, topicTitle: e.target.value })}
-                                        placeholder="Topic Name"
-                                        className="bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                        required
-                                    />
-                                    <select
-                                        value={contentForm.contentType}
-                                        onChange={e => setContentForm({ ...contentForm, contentType: e.target.value })}
-                                        className="bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                    >
-                                        <option value="video">Video</option>
-                                        <option value="document">Manual</option>
-                                        <option value="link">Link</option>
-                                    </select>
-                                </div>
-
-                                <input
-                                    type="url"
-                                    value={contentForm.contentLink}
-                                    onChange={e => setContentForm({ ...contentForm, contentLink: e.target.value })}
-                                    placeholder="Resource URL"
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                    required
-                                />
-
-                                <button
-                                    type="submit"
-                                    disabled={uploadingContent}
-                                    className="w-full py-4 bg-[#00B6C1] text-[#0E5858] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#0E5858] hover:text-white transition-all flex items-center justify-center gap-2"
-                                >
-                                    {uploadingContent ? <Loader2 className="animate-spin" size={16} /> : "Update Content Bank"}
-                                </button>
-                            </form>
 
                             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-[#0E5858]/5 overflow-hidden flex flex-col max-h-[500px]">
                                 <h3 className="text-xl font-serif text-[#0E5858] mb-6">Active Resource Nodes</h3>
@@ -1215,7 +1163,7 @@ function AdminDashboardContent() {
                                         <tr className="bg-[#0E5858]/5 text-[9px] font-black uppercase tracking-[0.2em] text-[#0E5858]/50">
                                             <th className="px-8 py-6">Counsellor</th>
                                             <th className="px-6 text-center">Credentials</th>
-                                            <th className="px-6">Joined</th>
+                                            <th className="px-6">Joined / Active</th>
                                             <th className="px-6 text-center">Avg Score</th>
                                             <th className="px-6 text-center">Progress %</th>
                                             <th className="px-6">Role</th>
@@ -1268,8 +1216,14 @@ function AdminDashboardContent() {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 text-[10px] font-bold text-[#0E5858]">
-                                                        {p.created_at ? new Date(p.created_at).toLocaleDateString() : '--'}
+                                                    <td className="px-6">
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-[10px] font-bold text-[#0E5858]">{p.created_at ? new Date(p.created_at).toLocaleDateString() : '--'}</span>
+                                                            {(() => {
+                                                                const lastAct = activity.find(a => a.user_id === p.id);
+                                                                return <span className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">{lastAct ? new Date(lastAct.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " " + new Date(lastAct.created_at).toLocaleDateString() : 'NO ACTIVITY'}</span>;
+                                                            })()}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 text-center">
                                                         {(() => {
@@ -1417,7 +1371,7 @@ function AdminDashboardContent() {
                                                                 <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
                                                                     {[0, 1, 2].map(entityIdx => (
                                                                         <div key={entityIdx} className="p-6 space-y-2">
-                                                                            <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">{entityIdx === 0 ? "Balance Nutrition" : (brands[entityIdx - 1] || 'Entity')}</p>
+                                                                            <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">{brands[entityIdx] || (entityIdx === 0 ? "Default" : "Entity")}</p>
                                                                             <p className="text-[11px] text-gray-600 leading-relaxed font-medium">{answers[entityIdx] || '--'}</p>
                                                                         </div>
                                                                     ))}
