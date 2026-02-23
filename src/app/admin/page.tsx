@@ -28,6 +28,7 @@ import {
     Link as LinkIcon,
     File as FileIcon,
     Plus,
+    Pencil,
     Database,
     Key as BNKeyIcon,
     Monitor,
@@ -133,13 +134,20 @@ function AdminDashboardContent() {
         email: "",
         password: "",
         fullName: "",
-        role: "mentor",
-        trainingBuddy: ""
+        role: "counsellor",
+        buddyName: "BN Admin",
+        buddyEmail: "admin@balancenutrition.in",
+        buddyPhone: "0000000000"
     });
     const [creatingUser, setCreatingUser] = useState(false);
     const [userSuccess, setUserSuccess] = useState("");
     const [userError, setUserError] = useState("");
+    const [deleteConfirm, setDeleteConfirm] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
     const [resettingUser, setResettingUser] = useState(false);
+    const [adminPhone, setAdminPhone] = useState("");
+    const [updatingAdmin, setUpdatingAdmin] = useState(false);
+    const [currentAdmin, setCurrentAdmin] = useState<Profile | null>(null);
 
     const [contentForm, setContentForm] = useState({
         moduleId: "",
@@ -159,7 +167,7 @@ function AdminDashboardContent() {
     });
     const [submittingAudit, setSubmittingAudit] = useState(false);
     const [editingBuddy, setEditingBuddy] = useState(false);
-    const [buddyValue, setBuddyValue] = useState("");
+    const [buddyList, setBuddyList] = useState<{ name: string; email: string; phone: string }[]>([]);
     const [updatingBuddy, setUpdatingBuddy] = useState(false);
 
     useEffect(() => {
@@ -177,6 +185,18 @@ function AdminDashboardContent() {
                 return;
             }
             await refreshData();
+
+            // Fetch current admin profile to pre-fill their contact info
+            const { data: aProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+            if (aProfile) {
+                setCurrentAdmin(aProfile);
+                setAdminPhone(aProfile.phone || "");
+            }
+
             setLoading(false);
         };
         checkAuth();
@@ -229,20 +249,32 @@ function AdminDashboardContent() {
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            const buddyInfo = JSON.stringify({
+                name: newUser.buddyName || "BN Admin",
+                email: newUser.buddyEmail || "admin@balancenutrition.in",
+                phone: newUser.buddyPhone || "0000000000"
+            });
+
             const response = await fetch('/api/admin/create-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session?.access_token}`,
                 },
-                body: JSON.stringify(newUser),
+                body: JSON.stringify({
+                    ...newUser,
+                    trainingBuddy: buddyInfo
+                }),
             });
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Provisioning failed');
 
-            setUserSuccess(`Authorized: ${newUser.email}. Account created and ready for use.`);
-            setNewUser({ email: "", password: "", fullName: "", role: "counsellor", trainingBuddy: "" });
+            setUserSuccess(`Authorized: ${newUser.email}. Account created.`);
+            setNewUser({
+                email: "", password: "", fullName: "", role: "counsellor",
+                buddyName: "BN Admin", buddyEmail: "admin@balancenutrition.in", buddyPhone: "0000000000"
+            });
             refreshData();
         } catch (err: any) {
             setUserError(err.message);
@@ -315,18 +347,37 @@ function AdminDashboardContent() {
         }
     };
 
+    const handleUpdateAdminProfile = async () => {
+        if (!currentAdmin) return;
+        setUpdatingAdmin(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ phone: adminPhone })
+                .eq('id', currentAdmin.id);
+            if (error) throw error;
+            alert("Contact info updated!");
+            refreshData();
+        } catch (err: any) {
+            alert("Failed to update: " + err.message);
+        } finally {
+            setUpdatingAdmin(false);
+        }
+    };
+
     const handleUpdateBuddy = async () => {
         if (!selectedProfile) return;
         setUpdatingBuddy(true);
         try {
+            const buddyJson = JSON.stringify(buddyList);
             const { error } = await supabase
                 .from('profiles')
-                .update({ training_buddy: buddyValue })
+                .update({ training_buddy: buddyJson })
                 .eq('id', selectedProfile.id);
 
             if (error) throw error;
 
-            setSelectedProfile({ ...selectedProfile, training_buddy: buddyValue });
+            setSelectedProfile({ ...selectedProfile, training_buddy: buddyJson });
             setEditingBuddy(false);
             refreshData();
         } catch (err: any) {
@@ -336,9 +387,21 @@ function AdminDashboardContent() {
         }
     };
 
-    const handleResetUser = async (userId: string) => {
-        if (!confirm("⚠️ CAUTION: This will permanently delete all activity logs, quiz scores, progress, and audits for this user. The account itself will remain active. Proceed?")) return;
+    const handleGiveRetest = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm("Are you sure you want to delete this quiz score and allow a retest?")) return;
+        try {
+            const { error } = await supabase.from('assessment_logs').delete().eq('id', id);
+            if (error) throw error;
+            alert("Retest granted. The user can now retake this quiz.");
+            refreshData();
+        } catch (err: any) {
+            alert("Error granting retest: " + err.message);
+        }
+    };
 
+    const handleResetUser = async (userId: string) => {
+        if (!confirm("⚠️ CAUTION: This will permanently delete all activity logs, quiz scores, progress, and audits for this user. Proceed?")) return;
         setResettingUser(true);
         try {
             await Promise.all([
@@ -347,7 +410,6 @@ function AdminDashboardContent() {
                 supabase.from('assessment_logs').delete().eq('user_id', userId),
                 supabase.from('summary_audits').delete().eq('user_id', userId)
             ]);
-
             alert("Account history has been cleared.");
             refreshData();
         } catch (err: any) {
@@ -355,6 +417,38 @@ function AdminDashboardContent() {
             alert("Failed to reset account data: " + err.message);
         } finally {
             setResettingUser(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!selectedProfile) return;
+        if (deleteConfirm !== "delete account") {
+            alert("Please type 'delete account' to confirm.");
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch('/api/admin/delete-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`
+                },
+                body: JSON.stringify({ userId: selectedProfile.id })
+            });
+
+            if (!res.ok) throw new Error("Deletion failed");
+
+            alert("Account permanently removed.");
+            setSelectedProfile(null);
+            refreshData();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsDeleting(false);
+            setDeleteConfirm("");
         }
     };
 
@@ -422,37 +516,147 @@ function AdminDashboardContent() {
                                                 );
                                             })()}
                                         </div>
-                                        <div className="flex justify-between items-center text-xs py-1">
-                                            <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Training Buddy</span>
-                                            {editingBuddy ? (
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={buddyValue}
-                                                        onChange={(e) => setBuddyValue(e.target.value)}
-                                                        className="bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#00B6C1]"
-                                                        placeholder="Enter Name"
-                                                    />
-                                                    <button
-                                                        onClick={handleUpdateBuddy}
-                                                        disabled={updatingBuddy}
-                                                        className="text-[#00B6C1] hover:text-[#0E5858]"
-                                                    >
-                                                        {updatingBuddy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={14} />}
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[#0E5858] font-bold">{selectedProfile.training_buddy || 'Unassigned'}</span>
+                                        <div className="flex flex-col text-xs py-1 border-b border-gray-50 pb-4 mb-2">
+                                            <div className="flex justify-between items-center w-full">
+                                                <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Assigned Buddies</span>
+                                                <div className="flex gap-2">
                                                     <button
                                                         onClick={() => {
-                                                            setBuddyValue(selectedProfile.training_buddy || "");
+                                                            let currentBuddies = [];
+                                                            try {
+                                                                const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
+                                                                currentBuddies = Array.isArray(parsed) ? parsed : [parsed];
+                                                            } catch (e) {
+                                                                if (selectedProfile.training_buddy) {
+                                                                    currentBuddies = [{ name: "BN Admin", email: selectedProfile.training_buddy, phone: "0000000000" }];
+                                                                }
+                                                            }
+                                                            setBuddyList([...currentBuddies, { name: "", email: "", phone: "" }]);
                                                             setEditingBuddy(true);
                                                         }}
+                                                        title="Add New Buddy"
                                                         className="text-gray-300 hover:text-[#00B6C1] transition-colors"
                                                     >
                                                         <Plus size={10} />
                                                     </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            try {
+                                                                const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
+                                                                setBuddyList(Array.isArray(parsed) ? parsed : [parsed]);
+                                                            } catch (e) {
+                                                                setBuddyList([{ name: "BN Admin", email: selectedProfile.training_buddy || "admin@balancenutrition.in", phone: "0000000000" }]);
+                                                            }
+                                                            setEditingBuddy(true);
+                                                        }}
+                                                        title="Edit Existing"
+                                                        className="text-gray-300 hover:text-[#00B6C1] transition-colors"
+                                                    >
+                                                        <Pencil size={10} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {editingBuddy ? (
+                                                <div className="flex flex-col gap-3 w-full mt-3">
+                                                    <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                                        {buddyList.map((buddy, idx) => (
+                                                            <div key={idx} className="space-y-2 p-4 bg-gray-50 rounded-2xl border border-gray-100 relative group/buddy">
+                                                                <button
+                                                                    onClick={() => setBuddyList(prev => prev.filter((_, i) => i !== idx))}
+                                                                    className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover/buddy:opacity-100 transition-all"
+                                                                >
+                                                                    <XCircle size={12} />
+                                                                </button>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Buddy Name"
+                                                                    value={buddy.name}
+                                                                    onChange={e => {
+                                                                        const newList = [...buddyList];
+                                                                        newList[idx].name = e.target.value;
+                                                                        setBuddyList(newList);
+                                                                    }}
+                                                                    className="w-full text-[10px] px-3 py-2 bg-white border border-gray-200 rounded-lg outline-none"
+                                                                />
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <input
+                                                                        type="email"
+                                                                        placeholder="Email"
+                                                                        value={buddy.email}
+                                                                        onChange={e => {
+                                                                            const newList = [...buddyList];
+                                                                            newList[idx].email = e.target.value;
+                                                                            setBuddyList(newList);
+                                                                        }}
+                                                                        className="w-full text-[10px] px-3 py-2 bg-white border border-gray-200 rounded-lg outline-none"
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Phone"
+                                                                        value={buddy.phone}
+                                                                        onChange={e => {
+                                                                            const newList = [...buddyList];
+                                                                            newList[idx].phone = e.target.value;
+                                                                            setBuddyList(newList);
+                                                                        }}
+                                                                        className="w-full text-[10px] px-3 py-2 bg-white border border-gray-200 rounded-lg outline-none"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            onClick={() => setBuddyList(prev => [...prev, { name: "", email: "", phone: "" }])}
+                                                            className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-[9px] font-black text-gray-300 uppercase tracking-widest hover:border-[#00B6C1] hover:text-[#00B6C1] transition-all"
+                                                        >
+                                                            + Add Another Support
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={handleUpdateBuddy}
+                                                            disabled={updatingBuddy}
+                                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0E5858] text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-[#00B6C1] transition-all"
+                                                        >
+                                                            {updatingBuddy ? <Loader2 size={12} className="animate-spin" /> : "Save Changes"}
+                                                        </button>
+                                                        <button onClick={() => setEditingBuddy(false)} className="px-4 py-3 bg-gray-100 text-gray-400 rounded-xl font-bold text-[10px] uppercase">Cancel</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-2 mt-2 w-full">
+                                                    {(() => {
+                                                        try {
+                                                            const raw = selectedProfile.training_buddy || '[]';
+                                                            const parsed = JSON.parse(raw);
+                                                            const buddiesArray = Array.isArray(parsed) ? parsed : [parsed];
+
+                                                            if (buddiesArray.length === 0) {
+                                                                return (
+                                                                    <div className="p-4 bg-[#FAFCEE] border border-[#0E5858]/10 rounded-2xl w-full">
+                                                                        <p className="text-[#0E5858] font-black text-[10px] uppercase tracking-widest mb-1">BN Admin</p>
+                                                                        <p className="text-[9px] text-gray-400 font-medium whitespace-nowrap overflow-hidden text-ellipsis">admin@balancenutrition.in</p>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            return buddiesArray.map((buddy, bIdx) => (
+                                                                <div key={bIdx} className="p-4 bg-[#FAFCEE] border border-[#0E5858]/10 rounded-2xl w-full">
+                                                                    <p className="text-[#0E5858] font-black text-[10px] uppercase tracking-widest mb-1 truncate">{buddy.name || "Unnamed Buddy"}</p>
+                                                                    <p className="text-[9px] text-gray-400 font-medium truncate mb-0.5">{buddy.email}</p>
+                                                                    <p className="text-[9px] text-gray-400 font-medium truncate">{buddy.phone}</p>
+                                                                </div>
+                                                            ));
+                                                        } catch (e) {
+                                                            // Fallback for old comma-separated emails
+                                                            return (selectedProfile.training_buddy || "admin@balancenutrition.in").split(',').map((email, i) => (
+                                                                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-[#FAFCEE] border border-[#0E5858]/10 rounded-lg w-full">
+                                                                    <Briefcase size={10} className="text-[#0E5858] opacity-50" />
+                                                                    <span className="text-[#0E5858] font-bold text-[10px] truncate">{email.trim()}</span>
+                                                                </div>
+                                                            ));
+                                                        }
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>
@@ -465,6 +669,26 @@ function AdminDashboardContent() {
                                             <span className="badge-teal text-[8px] uppercase">{selectedProfile.role}</span>
                                         </div>
 
+                                        <div className="pt-10 border-t border-red-50 mt-10 space-y-4">
+                                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest text-center">Danger Zone</p>
+                                            <div className="bg-red-50/50 p-6 rounded-[2rem] border border-red-100 space-y-4">
+                                                <p className="text-[9px] text-red-500 font-medium leading-relaxed text-center">To delete this account permanently, type "delete account" below.</p>
+                                                <input
+                                                    type="text"
+                                                    value={deleteConfirm}
+                                                    onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
+                                                    placeholder="type 'delete account'"
+                                                    className="w-full bg-white border border-red-100 rounded-xl py-3 px-4 text-xs text-red-600 font-bold outline-none focus:ring-2 focus:ring-red-200 text-center"
+                                                />
+                                                <button
+                                                    onClick={handleDeleteAccount}
+                                                    disabled={isDeleting || deleteConfirm !== 'delete account'}
+                                                    className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${deleteConfirm === 'delete account' ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                                >
+                                                    {isDeleting ? <Loader2 className="animate-spin" size={14} /> : <><Trash2 size={14} /> Permanent Deletion</>}
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div className="pt-6 mt-6 border-t border-red-50">
                                             <button
                                                 onClick={() => handleResetUser(selectedProfile.id)}
@@ -538,20 +762,53 @@ function AdminDashboardContent() {
                                         </h4>
                                         <div className="space-y-3">
                                             {assessments.filter(a => a.user_id === selectedProfile.id).map(quiz => (
-                                                <button
-                                                    key={quiz.id}
-                                                    onClick={() => setSelectedQuiz(quiz)}
-                                                    className="w-full p-4 bg-gray-50/50 rounded-2xl border border-gray-100 flex items-center justify-between hover:bg-white hover:shadow-lg transition-all"
-                                                >
-                                                    <div className="text-left">
-                                                        <p className="text-xs font-bold text-[#0E5858] uppercase tracking-widest">{quiz.topic_code}</p>
-                                                        <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">{new Date(quiz.created_at).toLocaleDateString()}</p>
+                                                <div key={quiz.id} className="w-full p-4 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col gap-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <p className="text-xs font-bold text-[#0E5858] uppercase tracking-widest">{quiz.topic_code} - Completed</p>
+                                                            <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">{new Date(quiz.created_at).toLocaleDateString()}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-xl font-serif text-[#0E5858]">{Math.round((quiz.score / (quiz.total_questions || 5)) * 100)}%</p>
+                                                            <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-widest">Score Captured</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xl font-serif text-[#0E5858]">{Math.round((quiz.score / (quiz.total_questions || 5)) * 100)}%</p>
-                                                        <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-widest">Score Captured</p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <button
+                                                            onClick={() => setSelectedQuiz(quiz)}
+                                                            className="px-4 py-2 bg-white border border-[#00B6C1]/20 rounded-xl text-[9px] font-black text-[#00B6C1] uppercase tracking-widest hover:bg-[#00B6C1] hover:text-white transition-all shadow-sm"
+                                                        >
+                                                            Review Quiz
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const matchingAudit = audits.find(a => a.user_id === selectedProfile.id && a.topic_code === quiz.topic_code);
+                                                                if (matchingAudit) {
+                                                                    setSelectedAudit(matchingAudit);
+                                                                } else {
+                                                                    alert("No peer audit found for this assessment.");
+                                                                }
+                                                            }}
+                                                            className="px-4 py-2 bg-white border border-[#FFCC00]/50 rounded-xl text-[9px] font-black text-[#FFCC00] uppercase tracking-widest hover:bg-[#FFCC00] hover:text-[#0E5858] transition-all shadow-sm"
+                                                        >
+                                                            Review Peer Audit
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleGiveRetest(quiz.id, e)}
+                                                            className="px-4 py-2 bg-white border border-red-200 rounded-xl text-[9px] font-black text-red-500 uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                                        >
+                                                            Give Retest
+                                                        </button>
+                                                        <a
+                                                            href={`mailto:${selectedProfile.email}?subject=Regarding your recent assessment: ${quiz.topic_code}`}
+                                                            onClick={e => e.stopPropagation()}
+                                                            className="px-4 py-2 bg-[#0E5858] text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#00B6C1] transition-all shadow-sm flex items-center gap-1"
+                                                        >
+                                                            <Mail size={10} /> Email
+                                                        </a>
                                                     </div>
-                                                </button>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
@@ -731,7 +988,40 @@ function AdminDashboardContent() {
                     </motion.div>
                 ) : activeTab === 'provisioning' ? (
                     <motion.div key="provisioning" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-12 max-w-3xl mx-auto">
-                        <header className="text-center">
+
+                        {/* Admin Own Settings: Professional Identity */}
+                        <div className="bg-[#0E5858] p-10 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-10">
+                                <ShieldCheck size={80} />
+                            </div>
+                            <div className="relative z-10">
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00B6C1] mb-2">Professional Identity</p>
+                                <h2 className="text-3xl font-serif mb-6">Your Clinical Information</h2>
+
+                                <div className="flex flex-col md:flex-row gap-6 items-end">
+                                    <div className="flex-1 space-y-2">
+                                        <label className="text-[9px] font-bold opacity-60 uppercase tracking-widest ml-1">Corporate Contact (Mobile)</label>
+                                        <input
+                                            type="text"
+                                            value={adminPhone}
+                                            onChange={(e) => setAdminPhone(e.target.value)}
+                                            placeholder="+91 00000 00000"
+                                            className="w-full bg-white/10 border border-white/10 rounded-xl py-3 px-6 text-sm outline-none focus:bg-white/20 transition-all font-semibold"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleUpdateAdminProfile}
+                                        disabled={updatingAdmin}
+                                        className="px-8 py-3 bg-[#00B6C1] text-[#0E5858] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white transition-all shadow-lg"
+                                    >
+                                        {updatingAdmin ? <Loader2 size={16} className="animate-spin" /> : "Save Identity"}
+                                    </button>
+                                </div>
+                                <p className="text-[9px] mt-4 opacity-40 font-medium">This information will be visible to counsellors assigned to you as their Training Buddy.</p>
+                            </div>
+                        </div>
+
+                        <header className="text-center pt-8">
                             <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight mb-4 text-center">Provision Access</h2>
                             <p className="text-gray-400 font-medium max-w-md mx-auto italic text-sm">Deploy secure credentials to new clinical team members.</p>
                         </header>
@@ -760,16 +1050,40 @@ function AdminDashboardContent() {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Mentor Buddy</label>
-                                    <input
-                                        type="text"
-                                        value={newUser.trainingBuddy}
-                                        onChange={(e) => setNewUser({ ...newUser, trainingBuddy: e.target.value })}
-                                        placeholder="Enter Buddy Name"
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
-                                        required
-                                    />
+                                <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
+                                    <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-[0.2em] mb-2">Training Buddy Identity</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Name</label>
+                                            <input
+                                                type="text"
+                                                value={newUser.buddyName}
+                                                onChange={(e) => setNewUser({ ...newUser, buddyName: e.target.value })}
+                                                placeholder="BN Admin"
+                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Email</label>
+                                            <input
+                                                type="email"
+                                                value={newUser.buddyEmail}
+                                                onChange={(e) => setNewUser({ ...newUser, buddyEmail: e.target.value })}
+                                                placeholder="admin@email.com"
+                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
+                                            />
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Corporate Phone</label>
+                                            <input
+                                                type="text"
+                                                value={newUser.buddyPhone}
+                                                onChange={(e) => setNewUser({ ...newUser, buddyPhone: e.target.value })}
+                                                placeholder="+91 00000 00000"
+                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Temporary Password</label>

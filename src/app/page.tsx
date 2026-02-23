@@ -34,6 +34,7 @@ export default function Home() {
   const router = useRouter();
   const [completedModules, setCompletedModules] = useState<string[]>([]);
   const [userStats, setUserStats] = useState({ progress: 0, avgScore: 0, quizzes: 0 });
+  const [lastModule, setLastModule] = useState<{ id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [trainingBuddy, setTrainingBuddy] = useState<string>("");
@@ -120,13 +121,73 @@ export default function Home() {
         setUserStats(prev => ({ ...prev, progress: compositeProgress }));
       }
 
-      // 4. Fetch All Mentors (Admins/Moderators)
-      const { data: mentors } = await supabase
-        .from('profiles')
-        .select('full_name, email, role')
-        .in('role', ['admin', 'moderator']);
+      // 4. Fetch Specific Assigned Mentors / Buddy Info
+      let mentorData: any[] = [];
+      if (profile?.training_buddy) {
+        try {
+          const parsed = JSON.parse(profile.training_buddy);
+          const buddiesArray = Array.isArray(parsed) ? parsed : [parsed];
 
-      setAllMentors(mentors || []);
+          mentorData = buddiesArray.map(buddy => ({
+            full_name: buddy.name || "BN Admin",
+            email: buddy.email || "admin@balancenutrition.in",
+            phone: buddy.phone || "0000000000",
+            role: 'Clinical Expert'
+          }));
+        } catch (e) {
+          // Fallback for old comma-separated emails
+          const emails = profile.training_buddy.split(',').map((e: string) => e.trim());
+          const { data: mentors } = await supabase
+            .from('profiles')
+            .select('full_name, email, role, phone')
+            .in('email', emails);
+          mentorData = (mentors || []).map(m => ({
+            full_name: m.full_name,
+            email: m.email,
+            phone: m.phone,
+            role: m.role || 'Clinical Expert'
+          }));
+        }
+      }
+
+      if (mentorData.length === 0) {
+        // Default System Buddy
+        mentorData = [{
+          full_name: "BN Admin",
+          email: "admin@balancenutrition.in",
+          phone: "0000000000",
+          role: "Clinical Expert"
+        }];
+      }
+
+      setAllMentors(mentorData);
+
+      // 5. Fetch Last Activity to determine Resume Module
+      const { data: lastLog } = await supabase
+        .from('mentor_activity_logs')
+        .select('module_id')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      let targetModule = null;
+      if (lastLog?.module_id && lastLog.module_id !== 'System') {
+        const mod = syllabusData.find(m => m.id === lastLog.module_id);
+        if (mod) targetModule = { id: mod.id, title: mod.title };
+      }
+
+      // If no activity or invalid module, find first incomplete module
+      if (!targetModule) {
+        const firstIncomplete = syllabusData.find(m => !dbCompletedModules.includes(m.id));
+        if (firstIncomplete) {
+          targetModule = { id: firstIncomplete.id, title: firstIncomplete.title };
+        } else {
+          // All complete? Link to first
+          targetModule = { id: syllabusData[0].id, title: syllabusData[0].title };
+        }
+      }
+      setLastModule(targetModule);
 
       setLoading(false);
     };
@@ -190,9 +251,11 @@ export default function Home() {
                 <Briefcase size={18} />
               </div>
               <div>
-                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Mentor Buddy</p>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Training Buddy</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-lg font-serif text-[#0E5858] truncate max-w-[100px]">{trainingBuddy || 'Unassigned'}</p>
+                  <p className="text-lg font-serif text-[#0E5858] truncate max-w-[100px]">
+                    {allMentors.length > 0 ? (allMentors.length > 1 ? `${allMentors.length} Mentors` : allMentors[0].full_name.split(' ')[0]) : 'Unassigned'}
+                  </p>
                   <Info size={10} className="text-[#00B6C1]" />
                 </div>
               </div>
@@ -219,7 +282,7 @@ export default function Home() {
         </header>
 
         {/* Hero Section: Progress Tracking */}
-        <motion.section variants={itemVariants} className="mb-16">
+        <motion.section variants={itemVariants} className="mb-12">
           <div className="relative isolate group p-8 lg:p-12 bg-[#0E5858] rounded-[3.5rem] shadow-3xl shadow-[#0E5858]/30 overflow-hidden text-white">
             <div className="absolute top-[-50%] right-[-10%] w-[60%] h-[150%] bg-[#00B6C1]/10 rounded-full blur-[100px] -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
 
@@ -231,10 +294,10 @@ export default function Home() {
                 </div>
                 <h2 className="text-5xl lg:text-6xl font-serif mb-6 leading-tight">Master the Art of <br />Clinical Consultation</h2>
                 <button
-                  onClick={() => router.push('/modules/module-4')}
+                  onClick={() => router.push(`/modules/${lastModule?.id || 'module-1'}`)}
                   className="px-8 py-4 bg-[#00B6C1] text-[#0E5858] rounded-2xl font-bold shadow-2xl hover:bg-white transition-all flex items-center gap-3 group/btn"
                 >
-                  Jump to Module 4
+                  {completedModules.includes(lastModule?.id || '') ? 'Review' : 'Resume'} {lastModule?.title || 'Training'}
                   <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -274,6 +337,39 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </motion.section>
+
+        {/* Quick Access: Training Support */}
+        <motion.section variants={itemVariants} className="mb-16">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-2xl font-serif text-[#0E5858]">Training Support</h3>
+            <div className="h-0.5 flex-1 bg-gray-100 mx-6 opacity-50" />
+            <button onClick={() => setShowBuddyModal(true)} className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest hover:underline transition-all">View All Mentors</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {allMentors.slice(0, 3).map((mentor, i) => (
+              <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-[#0E5858]/5 shadow-sm hover:shadow-xl hover:shadow-[#0E5858]/5 transition-all flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] font-black text-lg border border-[#0E5858]/5 group-hover:bg-[#0E5858] group-hover:text-white transition-colors">
+                    {mentor.full_name[0]}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-serif font-bold text-[#0E5858] mb-0.5">{mentor.full_name}</h4>
+                    <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-widest opacity-70">{mentor.role}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <a href={`tel:${mentor.phone}`} className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#0E5858] hover:bg-white hover:shadow-sm transition-all">
+                    <Phone size={14} />
+                  </a>
+                  <a href={`mailto:${mentor.email}`} className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#0E5858] hover:bg-white hover:shadow-sm transition-all">
+                    <Mail size={14} />
+                  </a>
+                </div>
+              </div>
+            ))}
           </div>
         </motion.section>
 
@@ -328,26 +424,6 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Quick Links Footer */}
-        <motion.section variants={itemVariants} className="mt-20 pt-12 border-t border-gray-100 grid grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          {[
-            { title: 'Content Bank', icon: ShoppingBag, url: '/content-bank' },
-            { title: 'Peer Audits', icon: Share2, url: '#' },
-            { title: 'Certifications', icon: Trophy, url: '#' },
-            { title: 'Clinical Log', icon: FileSpreadsheet, url: '#' }
-          ].map((link, i) => (
-            <button
-              key={i}
-              onClick={() => router.push(link.url)}
-              className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white transition-colors text-left group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00B6C1] transition-colors">
-                <link.icon size={18} />
-              </div>
-              <span className="text-xs font-bold text-[#0E5858] uppercase tracking-widest">{link.title}</span>
-            </button>
-          ))}
-        </motion.section>
         {/* Modal: Training Buddies */}
         <AnimatePresence>
           {showBuddyModal && (
@@ -390,7 +466,7 @@ export default function Home() {
                         <a href={`mailto:${mentor.email}`} className="p-3 bg-white rounded-xl text-gray-400 hover:text-[#0E5858] hover:shadow-md transition-all">
                           <Mail size={16} />
                         </a>
-                        <a href={`tel:+910000000000`} className="p-3 bg-white rounded-xl text-gray-400 hover:text-[#00B6C1] hover:shadow-md transition-all">
+                        <a href={`tel:${mentor.phone || '#'}`} className={`p-3 bg-white rounded-xl ${mentor.phone ? 'text-gray-400 hover:text-[#00B6C1]' : 'text-gray-200 cursor-not-allowed'} hover:shadow-md transition-all`}>
                           <Phone size={16} />
                         </a>
                       </div>
