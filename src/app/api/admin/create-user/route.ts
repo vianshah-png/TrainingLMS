@@ -43,13 +43,12 @@ export async function POST(request: Request) {
                     full_name: fullName,
                     role: role || 'counsellor',
                     training_buddy: trainingBuddy || '',
-                    temp_password: password,
-                    updated_at: new Date().toISOString()
+                    temp_password: password
                 });
 
             if (profileError) {
-                // If column doesn't exist, we'll log it but not fail the creation
-                console.warn('Profile enrichment warning (column might be missing):', profileError.message);
+                console.error('Profile creation error:', profileError);
+                return NextResponse.json({ error: 'Auth user created but profile synchronization failed.' }, { status: 500 });
             }
 
             // 3. Initialize progress tracking activity

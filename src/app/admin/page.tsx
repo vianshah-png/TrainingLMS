@@ -133,7 +133,7 @@ function AdminDashboardContent() {
         email: "",
         password: "",
         fullName: "",
-        role: "counsellor",
+        role: "mentor",
         trainingBuddy: ""
     });
     const [creatingUser, setCreatingUser] = useState(false);
@@ -158,6 +158,9 @@ function AdminDashboardContent() {
         topicCode: "FINAL-REVIEW"
     });
     const [submittingAudit, setSubmittingAudit] = useState(false);
+    const [editingBuddy, setEditingBuddy] = useState(false);
+    const [buddyValue, setBuddyValue] = useState("");
+    const [updatingBuddy, setUpdatingBuddy] = useState(false);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -312,6 +315,27 @@ function AdminDashboardContent() {
         }
     };
 
+    const handleUpdateBuddy = async () => {
+        if (!selectedProfile) return;
+        setUpdatingBuddy(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ training_buddy: buddyValue })
+                .eq('id', selectedProfile.id);
+
+            if (error) throw error;
+
+            setSelectedProfile({ ...selectedProfile, training_buddy: buddyValue });
+            setEditingBuddy(false);
+            refreshData();
+        } catch (err: any) {
+            alert("Failed to update buddy: " + err.message);
+        } finally {
+            setUpdatingBuddy(false);
+        }
+    };
+
     const handleResetUser = async (userId: string) => {
         if (!confirm("⚠️ CAUTION: This will permanently delete all activity logs, quiz scores, progress, and audits for this user. The account itself will remain active. Proceed?")) return;
 
@@ -398,9 +422,39 @@ function AdminDashboardContent() {
                                                 );
                                             })()}
                                         </div>
-                                        <div className="flex justify-between items-center text-xs">
+                                        <div className="flex justify-between items-center text-xs py-1">
                                             <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Training Buddy</span>
-                                            <span className="text-[#0E5858] font-bold">{selectedProfile.training_buddy || 'Unassigned'}</span>
+                                            {editingBuddy ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={buddyValue}
+                                                        onChange={(e) => setBuddyValue(e.target.value)}
+                                                        className="bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[#00B6C1]"
+                                                        placeholder="Enter Name"
+                                                    />
+                                                    <button
+                                                        onClick={handleUpdateBuddy}
+                                                        disabled={updatingBuddy}
+                                                        className="text-[#00B6C1] hover:text-[#0E5858]"
+                                                    >
+                                                        {updatingBuddy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={14} />}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[#0E5858] font-bold">{selectedProfile.training_buddy || 'Unassigned'}</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setBuddyValue(selectedProfile.training_buddy || "");
+                                                            setEditingBuddy(true);
+                                                        }}
+                                                        className="text-gray-300 hover:text-[#00B6C1] transition-colors"
+                                                    >
+                                                        <Plus size={10} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Joined On</span>
