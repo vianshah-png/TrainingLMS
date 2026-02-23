@@ -31,6 +31,7 @@ export default function Home() {
   const [userStats, setUserStats] = useState({ progress: 0, avgScore: 0, quizzes: 0 });
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
+  const [trainingBuddy, setTrainingBuddy] = useState<string>("");
   const [dynamicContent, setDynamicContent] = useState<any[]>([]);
 
   useEffect(() => {
@@ -42,6 +43,17 @@ export default function Home() {
       }
 
       setUserName(session.user.user_metadata?.full_name || "Counsellor");
+
+      // 0. Fetch Profile for Training Buddy
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('training_buddy')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile?.training_buddy) {
+        setTrainingBuddy(profile.training_buddy);
+      }
 
       // 1. Fetch Dynamic Content Metadata (to count total topics)
       const { data: dynContent } = await supabase
@@ -154,8 +166,17 @@ export default function Home() {
           </motion.div>
 
           {/* Top Stats Cards */}
-          <motion.div variants={itemVariants} className="flex gap-4">
-            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-[#0E5858]/5 flex items-center gap-4 min-w-[180px]">
+          <motion.div variants={itemVariants} className="flex flex-wrap gap-4">
+            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-[#0E5858]/5 flex items-center gap-4 min-w-[170px]">
+              <div className="w-10 h-10 rounded-2xl bg-[#00B6C1]/10 text-[#00B6C1] flex items-center justify-center">
+                <Briefcase size={18} />
+              </div>
+              <div>
+                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Mentor Buddy</p>
+                <p className="text-lg font-serif text-[#0E5858] truncate max-w-[100px]">{trainingBuddy || 'Unassigned'}</p>
+              </div>
+            </div>
+            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-[#0E5858]/5 flex items-center gap-4 min-w-[170px]">
               <div className="w-10 h-10 rounded-2xl bg-[#00B6C1]/10 text-[#00B6C1] flex items-center justify-center">
                 <Trophy size={18} />
               </div>
@@ -164,7 +185,7 @@ export default function Home() {
                 <p className="text-lg font-serif text-[#0E5858]">{userStats.avgScore}%</p>
               </div>
             </div>
-            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-[#0E5858]/5 flex items-center gap-4 min-w-[180px]">
+            <div className="bg-white px-6 py-4 rounded-3xl shadow-sm border border-[#0E5858]/5 flex items-center gap-4 min-w-[170px]">
               <div className="w-10 h-10 rounded-2xl bg-[#FFCC00]/10 text-[#FFCC00] flex items-center justify-center">
                 <Activity size={18} />
               </div>
@@ -306,7 +327,7 @@ export default function Home() {
             </button>
           ))}
         </motion.section>
-      </motion.div>
-    </main>
+      </motion.div >
+    </main >
   );
 }

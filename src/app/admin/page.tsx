@@ -708,15 +708,14 @@ function AdminDashboardContent() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Mentor Buddy</label>
-                                    <select
+                                    <input
+                                        type="text"
                                         value={newUser.trainingBuddy}
                                         onChange={(e) => setNewUser({ ...newUser, trainingBuddy: e.target.value })}
-                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none appearance-none"
+                                        placeholder="Enter Buddy Name"
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
                                         required
-                                    >
-                                        <option value="">Select Buddy</option>
-                                        {buddies.map(b => <option key={b.id} value={b.full_name}>{b.full_name}</option>)}
-                                    </select>
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Temporary Password</label>
