@@ -9,16 +9,9 @@ export async function POST(request: Request) {
     if (!auth.authorized) return auth.response;
 
     const counsellors = [
-        { name: 'Anjali Mehta', email: 'anjali.m@balancenutrition.in' },
-        { name: 'Rahul Sharma', email: 'rahul.s@balancenutrition.in' },
-        { name: 'Priya Kapoor', email: 'priya.k@balancenutrition.in' },
+        { name: 'Shivani', email: 'priya.k@balancenutrition.in' },
         { name: 'Vikram Joshi', email: 'vikram.j@balancenutrition.in' },
-        { name: 'Sneha Reddy', email: 'sneha.r@balancenutrition.in' },
-        { name: 'Amit Verma', email: 'amit.v@balancenutrition.in' },
-        { name: 'Kavita Patil', email: 'kavita.p@balancenutrition.in' },
-        { name: 'Rohan Bakshi', email: 'rohan.b@balancenutrition.in' },
-        { name: 'Neha Singh', email: 'neha.s@balancenutrition.in' },
-        { name: 'Karan Thapar', email: 'karan.t@balancenutrition.in' }
+        { name: 'BN Admin', email: 'workwithus@balancenutrition.in' }
     ];
 
     const results = [];
