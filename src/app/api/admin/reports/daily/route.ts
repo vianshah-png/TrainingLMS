@@ -44,15 +44,37 @@ export async function GET(request: Request) {
 
             // Calculate Longest Time Spent Today (from raw_data.time_spent)
             let maxTimeSpent = 0;
+            let longestTopicCode = "";
             todayAssessments.forEach(a => {
                 const time = a.raw_data?.time_spent || 0;
-                if (time > maxTimeSpent) maxTimeSpent = time;
+                if (time > maxTimeSpent) {
+                    maxTimeSpent = time;
+                    longestTopicCode = a.topic_code;
+                }
             });
+
+            // Resolve Longest Topic Title
+            let longestTopicTitle = "N/A";
+            if (longestTopicCode) {
+                if (longestTopicCode.startsWith('MODULE_')) {
+                    const modId = longestTopicCode.replace('MODULE_', '');
+                    const mod = syllabusData.find(m => m.id === modId);
+                    longestTopicTitle = mod ? `${mod.title.split(':')[0]} (Final)` : "Final Quiz";
+                } else {
+                    for (const mod of syllabusData) {
+                        const topic = mod.topics.find(t => t.code === longestTopicCode);
+                        if (topic) {
+                            longestTopicTitle = `${mod.title.split(':')[0]}: ${topic.title}`;
+                            break;
+                        }
+                    }
+                }
+            }
 
             // Convert to minutes/seconds format
             const longestTimeStr = maxTimeSpent > 0
                 ? `${Math.floor(maxTimeSpent / 60)}m ${maxTimeSpent % 60}s`
-                : "0m 0s";
+                : "0s";
 
             // Calculate Modules Completed Today
             let modulesCompletedToday = 0;
@@ -69,7 +91,6 @@ export async function GET(request: Request) {
                 const quizPassed = userGlobalAssessments.some(a => a.topic_code === `MODULE_${module.id}`);
 
                 if (allDone && quizPassed) {
-                    // It's complete. Did it finish TODAY?
                     const lastTopicCreated = userGlobalProgress
                         .filter(pr => allModuleCodes.includes(pr.topic_code))
                         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at;
@@ -96,10 +117,10 @@ export async function GET(request: Request) {
             return {
                 name: p.full_name,
                 email: p.email,
-                segmentsCompleted: todayProgress.length,
                 testsTaken: todayAssessments.length,
                 modulesCompletedToday,
                 longestTime: longestTimeStr,
+                longestTopic: longestTopicTitle,
                 globalProgress: globalProgressPercent,
                 avgScore: todayAssessments.length > 0
                     ? Math.round(todayAssessments.reduce((acc, curr) => acc + curr.score, 0) / todayAssessments.length)

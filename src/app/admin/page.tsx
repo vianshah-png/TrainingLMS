@@ -1995,24 +1995,23 @@ function AdminDashboardContent() {
                                             <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-4">{user.email}</p>
 
                                             <div className="flex flex-col gap-2">
-                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                                                    <span className="text-gray-400">Today's Segments</span>
-                                                    <span className="text-[#0E5858]">{user.segmentsCompleted}</span>
+                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-[#0E5858]">
+                                                    <span className="text-[#0E5858]/40">Today's Tests</span>
+                                                    <span>{user.testsTaken}</span>
                                                 </div>
-                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                                                    <span className="text-gray-400">Tests (Today)</span>
-                                                    <span className="text-[#0E5858]">{user.testsTaken}</span>
+                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-[#00B6C1]">
+                                                    <span className="text-[#00B6C1]/50">Modules Finished</span>
+                                                    <span>{user.modulesCompletedToday}</span>
                                                 </div>
-                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                                                    <span className="text-gray-400">Modules Finished</span>
-                                                    <span className="text-[#00B6C1]">{user.modulesCompletedToday}</span>
-                                                </div>
-                                                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                                                    <span className="text-gray-400">Longest Session</span>
-                                                    <span className="text-orange-500">{user.longestTime}</span>
+                                                <div className="pt-2 mt-1 border-t border-gray-50 flex flex-col gap-1">
+                                                    <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Longest Active Session</p>
+                                                    <p className="text-[10px] font-bold text-[#0E5858] leading-tight flex justify-between items-center">
+                                                        <span className="truncate max-w-[120px]">{user.longestTopic}</span>
+                                                        <span className="text-orange-500 shrink-0">{user.longestTime}</span>
+                                                    </p>
                                                 </div>
                                                 <div className="pt-2 border-t border-gray-50 flex justify-between items-end mt-1">
-                                                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Global Program %</span>
+                                                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Global Progress</span>
                                                     <span className="text-sm font-serif text-[#0E5858] font-bold">{user.globalProgress}%</span>
                                                 </div>
                                             </div>
@@ -2022,14 +2021,14 @@ function AdminDashboardContent() {
                                 <button
                                     onClick={() => {
                                         const text = reportData.report.map((u: any) =>
-                                            `• ${u.name} (${u.email}): ${u.segmentsCompleted} Segments, ${u.testsTaken} Tests today. Modules Finished today: ${u.modulesCompletedToday}. Longest Session: ${u.longestTime}. Global Training Progress: ${u.globalProgress}%`
+                                            `• ${u.name}: ${u.testsTaken} Tests today. Modules Finished today: ${u.modulesCompletedToday}. Longest Session: ${u.longestTopic} (${u.longestTime}). Overall Progress: ${u.globalProgress}%`
                                         ).join('\n');
-                                        navigator.clipboard.writeText(`DAILY TRAINING REPORT - ${reportData.date}\n\n${text}`);
-                                        alert("Full report copied to clipboard!");
+                                        navigator.clipboard.writeText(`DAILY ACADEMY LOG - ${reportData.date}\n\n${text}`);
+                                        alert("Report synchronized to clipboard!");
                                     }}
                                     className="mt-6 w-full py-4 bg-white border border-[#0E5858]/10 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-[#0E5858] hover:bg-gray-50 transition-all"
                                 >
-                                    Copy Comprehensive Report
+                                    Copy Synchronized Report
                                 </button>
                             </div>
                         )}
