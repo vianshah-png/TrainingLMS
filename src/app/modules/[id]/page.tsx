@@ -313,17 +313,6 @@ export default function ModulePage() {
     };
 
     const handleContinue = (newlyCompleted?: string) => {
-        if (moduleId === 'module-2') {
-            const currentCompleted = newlyCompleted
-                ? (completedTopics.includes(newlyCompleted) ? completedTopics : [...completedTopics, newlyCompleted])
-                : completedTopics;
-            const hasPeerReview = currentCompleted.includes('M2-05');
-            if (!hasPeerReview) {
-                alert("Please submit your Peer Review report before proceeding to the Final Audit.");
-                return;
-            }
-        }
-
         const currentCompleted = newlyCompleted
             ? (completedTopics.includes(newlyCompleted) ? completedTopics : [...completedTopics, newlyCompleted])
             : completedTopics;
@@ -331,22 +320,25 @@ export default function ModulePage() {
         const allTopicsDone = moduleTopics.every(t => currentCompleted.includes(t.code));
 
         if (allTopicsDone) {
+            // Prerequisites
+            if (moduleId === 'module-2' && !currentCompleted.includes('M2-05')) {
+                alert("Please submit your Peer Review report before proceeding to the module quiz.");
+                return;
+            }
+
             if (moduleId === 'module-4' && !simulationDone) {
                 setShowSimulation(true);
                 return;
             }
 
-            if (moduleId === 'module-2') {
-                if (currentCompleted.includes('M2-05')) {
-                    if (!assessmentPassed) {
-                        setShowVivaIntro(true);
-                    } else if (nextModule) {
-                        router.push(`/modules/${nextModule.id}`);
-                    }
-                } else {
-                    alert("Please submit your Peer Review report (M2-05) before taking the final audit.");
-                }
-            } else if (nextModule) {
+            // Universal Module Quiz Check
+            if (!assessmentPassed) {
+                setShowVivaIntro(true); // This shows the quiz invitation
+                return;
+            }
+
+            // Move to Next Module
+            if (nextModule) {
                 router.push(`/modules/${nextModule.id}`);
             } else {
                 router.push('/');
@@ -414,15 +406,15 @@ export default function ModulePage() {
                                 <Brain size={40} />
                             </div>
 
-                            <h2 className="text-4xl font-serif text-[#0E5858] mb-4">Final Audit: Viva Session</h2>
-                            <p className="text-gray-500 font-medium mb-10 italic">"Proficiency check for Phase 1 certification."</p>
+                            <h2 className="text-4xl font-serif text-[#0E5858] mb-4">{baseModule.title} Quiz</h2>
+                            <p className="text-gray-500 font-medium mb-10 italic">"Verify your proficiency before proceeding to the next segment."</p>
 
                             <div className="bg-[#FAFCEE] rounded-3xl p-8 text-left mb-10 space-y-4 border border-[#00B6C1]/10">
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] mb-2">Audit Rules & Protocols</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] mb-2">Quiz Rules & Protocols</h4>
                                 <ul className="space-y-3">
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
-                                        <span>Time Limit: 10 Minutes to complete all segments.</span>
+                                        <span>Time Limit: 10 Minutes to complete all questions.</span>
                                     </li>
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
@@ -430,11 +422,7 @@ export default function ModulePage() {
                                     </li>
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
-                                        <span>Reporting: Scores are shared directly with the Founder & Admin Dashboard.</span>
-                                    </li>
-                                    <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
-                                        <span>Retest Protocol: Low scores require training lead approval for re-attempt.</span>
+                                        <span>Reporting: Scores are logged for training lead review.</span>
                                     </li>
                                 </ul>
                             </div>
@@ -446,7 +434,7 @@ export default function ModulePage() {
                                 }}
                                 className="w-full py-5 bg-[#0E5858] text-white rounded-[1.5rem] font-bold shadow-2xl hover:bg-[#00B6C1] transition-all flex items-center justify-center gap-3"
                             >
-                                Start Final Audit
+                                Start Module Quiz
                                 <ChevronRight size={18} />
                             </button>
 

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
                 id: userId,
                 email: email,
                 full_name: fullName || email.split('@')[0],
-                role: 'counsellor'
+                role: 'mentor'
             })
             .select()
             .single();

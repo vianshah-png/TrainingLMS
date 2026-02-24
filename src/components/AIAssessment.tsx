@@ -66,7 +66,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
             const response = await fetch("/api/generate-test", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ topicTitle, topicContent, topicLinks: "" }),
+                body: JSON.stringify({ topicTitle, topicContent, topicLinks: "", topicCode }),
             });
             const data = await response.json();
             setQuestions(data.questions);

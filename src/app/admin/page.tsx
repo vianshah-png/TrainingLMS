@@ -44,7 +44,8 @@ import {
     BrainCircuit,
     CheckCircle,
     Star,
-    Layout
+    Layout,
+    Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -138,9 +139,7 @@ function AdminDashboardContent() {
         password: "",
         fullName: "",
         role: "counsellor",
-        buddyName: "BN Admin",
-        buddyEmail: "admin@balancenutrition.in",
-        buddyPhone: "0000000000"
+        buddies: [{ name: "BN Admin", email: "admin@balancenutrition.in", phone: "0000000000" }]
     });
     const [creatingUser, setCreatingUser] = useState(false);
     const [userSuccess, setUserSuccess] = useState("");
@@ -161,6 +160,9 @@ function AdminDashboardContent() {
     const [uploadingContent, setUploadingContent] = useState(false);
     const [contentSuccess, setContentSuccess] = useState("");
     const [contentError, setContentError] = useState("");
+    const [isCleaning, setIsCleaning] = useState(false);
+    const [cleanupSuccess, setCleanupSuccess] = useState("");
+    const [cleanupError, setCleanupError] = useState("");
 
     // Audit Report Form
     const [auditForm, setAuditForm] = useState({
@@ -172,6 +174,17 @@ function AdminDashboardContent() {
     const [editingBuddy, setEditingBuddy] = useState(false);
     const [buddyList, setBuddyList] = useState<{ name: string; email: string; phone: string }[]>([]);
     const [updatingBuddy, setUpdatingBuddy] = useState(false);
+
+    // Quiz Editor States
+    const [selectedQuizTopic, setSelectedQuizTopic] = useState("");
+    const [manualQuizQuestions, setManualQuizQuestions] = useState<any[]>([]);
+    const [isFetchingQuiz, setIsFetchingQuiz] = useState(false);
+    const [isSavingQuiz, setIsSavingQuiz] = useState(false);
+    const [quizSuccess, setQuizSuccess] = useState("");
+    const [quizError, setQuizError] = useState("");
+    const [customAIPrompt, setCustomAIPrompt] = useState("");
+    const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -234,7 +247,7 @@ function AdminDashboardContent() {
         }
     };
 
-    const counsellors = useMemo(() => profiles.filter(p => p.role === 'counsellor'), [profiles]);
+    const counsellors = useMemo(() => profiles.filter(p => p.role === 'counsellor' || p.role === 'mentor'), [profiles]);
     const buddies = useMemo(() => profiles.filter(p => p.role === 'moderator' || p.role === 'admin'), [profiles]);
 
     const filteredRegistry = useMemo(() => {
@@ -251,21 +264,28 @@ function AdminDashboardContent() {
         setUserSuccess("");
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const buddyInfo = JSON.stringify([{
-                name: newUser.buddyName || "BN Admin",
-                email: newUser.buddyEmail || "admin@balancenutrition.in",
-                phone: newUser.buddyPhone || "0000000000"
-            }]);
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) throw new Error('Session expired. Please log in again.');
+
+            // Validation for buddies
+            const incompleteBuddy = newUser.buddies.find(b => !b.name || !b.email || !b.phone);
+            if (incompleteBuddy) {
+                throw new Error("Please provide complete contact information (Name, Email, Phone) for all training buddies.");
+            }
+
+            const buddyInfo = JSON.stringify(newUser.buddies);
 
             const response = await fetch('/api/admin/create-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`,
+                    'Authorization': `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
-                    ...newUser,
+                    email: newUser.email,
+                    password: newUser.password,
+                    fullName: newUser.fullName,
+                    role: newUser.role,
                     trainingBuddy: buddyInfo
                 }),
             });
@@ -276,13 +296,44 @@ function AdminDashboardContent() {
             setUserSuccess(`Authorized: ${newUser.email}. Account created.`);
             setNewUser({
                 email: "", password: "", fullName: "", role: "counsellor",
-                buddyName: "BN Admin", buddyEmail: "admin@balancenutrition.in", buddyPhone: "0000000000"
+                buddies: [{ name: "BN Admin", email: "admin@balancenutrition.in", phone: "0000000000" }]
             });
             refreshData();
         } catch (err: any) {
             setUserError(err.message);
         } finally {
             setCreatingUser(false);
+        }
+    };
+
+    const handleCleanupAccounts = async () => {
+        if (!confirm("CRITICAL ACTION: This will PERMANENTLY delete all Supabase Auth accounts that do not have a matching 'profile' in the Unified Registry. Restored accounts WILL NOT be possible. Continue?")) return;
+
+        setIsCleaning(true);
+        setCleanupError("");
+        setCleanupSuccess("");
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Session expired. Please log in again.');
+
+            const response = await fetch('/api/admin/cleanup-users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Cleanup failed');
+
+            setCleanupSuccess(data.message);
+            refreshData();
+        } catch (err: any) {
+            setCleanupError(err.message);
+        } finally {
+            setIsCleaning(false);
         }
     };
 
@@ -293,12 +344,14 @@ function AdminDashboardContent() {
         setContentSuccess("");
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) throw new Error('Session expired. Please log in again.');
+
             const response = await fetch('/api/admin/content', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`
+                    'Authorization': `Bearer ${session.access_token}`
                 },
                 body: JSON.stringify(contentForm),
             });
@@ -354,12 +407,13 @@ function AdminDashboardContent() {
         if (!currentAdmin) return;
         setUpdatingAdmin(true);
         try {
+            // Removing 'phone' update to avoid schema cache error
             const { error } = await supabase
                 .from('profiles')
-                .update({ phone: adminPhone })
+                .update({ full_name: currentAdmin.full_name })
                 .eq('id', currentAdmin.id);
             if (error) throw error;
-            alert("Contact info updated!");
+            alert("Profile synchronized!");
             refreshData();
         } catch (err: any) {
             alert("Failed to update: " + err.message);
@@ -372,6 +426,11 @@ function AdminDashboardContent() {
         if (!selectedProfile) return;
         setUpdatingBuddy(true);
         try {
+            const incompleteBuddy = buddyList.find(b => !b.name || !b.email || !b.phone);
+            if (incompleteBuddy) {
+                throw new Error("Please provide complete contact information (Name, Email, Phone) for all buddies.");
+            }
+
             const buddyJson = JSON.stringify(buddyList);
             const { error } = await supabase
                 .from('profiles')
@@ -432,12 +491,14 @@ function AdminDashboardContent() {
 
         setIsDeleting(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) throw new Error('Session expired. Please log in again.');
+
             const res = await fetch('/api/admin/delete-user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token}`
+                    'Authorization': `Bearer ${session.access_token}`
                 },
                 body: JSON.stringify({ userId: selectedProfile.id })
             });
@@ -454,6 +515,131 @@ function AdminDashboardContent() {
             setDeleteConfirm("");
         }
     };
+
+    const handleFetchManualQuiz = async (topicCode: string) => {
+        if (!topicCode) {
+            setManualQuizQuestions([]);
+            return;
+        }
+        setIsFetchingQuiz(true);
+        setQuizError("");
+        setQuizSuccess("");
+        try {
+            const res = await fetch(`/api/admin/quiz?topicCode=${topicCode}`);
+            const data = await res.json();
+            if (data.quiz) {
+                setManualQuizQuestions(data.quiz.questions);
+            } else {
+                setManualQuizQuestions([]);
+            }
+        } catch (err: any) {
+            setQuizError("Failed to load quiz.");
+        } finally {
+            setIsFetchingQuiz(false);
+        }
+    };
+
+    const handleSaveManualQuiz = async () => {
+        if (!selectedQuizTopic) return;
+        setIsSavingQuiz(true);
+        setQuizError("");
+        setQuizSuccess("");
+        try {
+            // Force user/session refresh
+            await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (!session) throw new Error("Session expired. Please log in again.");
+
+            const res = await fetch('/api/admin/quiz', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    topicCode: selectedQuizTopic,
+                    questions: manualQuizQuestions
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Save failed");
+            setQuizSuccess("Quiz protocols synchronized successfully.");
+        } catch (err: any) {
+            setQuizError(err.message);
+        } finally {
+            setIsSavingQuiz(false);
+        }
+    };
+
+    const handleDeleteManualQuiz = async () => {
+        if (!selectedQuizTopic || !confirm("Delete all manual questions for this topic? It will fallback to AI generation.")) return;
+        setIsSavingQuiz(true);
+        try {
+            await supabase.auth.getUser();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Session expired. Please log in again.");
+
+            const res = await fetch(`/api/admin/quiz?topicCode=${selectedQuizTopic}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+            if (!res.ok) throw new Error("Delete failed");
+            setManualQuizQuestions([]);
+            setQuizSuccess("Manual quiz removed. System restored to AI defaults.");
+        } catch (err: any) {
+            setQuizError(err.message);
+        } finally {
+            setIsSavingQuiz(false);
+        }
+    };
+
+    const handleGenerateAISuggestions = async () => {
+        if (!selectedQuizTopic) return;
+        setIsGeneratingSuggestions(true);
+        setQuizError("");
+        setQuizSuccess("");
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Session expired. Please log in again.");
+
+            // Find topic title and content from syllabus
+            const topicId = selectedQuizTopic.replace("MODULE_", "");
+            const module = syllabusData.find(m => m.id === topicId);
+            const topicTitle = module?.title || "Unknown Topic";
+            // We'll use a summary of topics as content since it's a "Module" quiz
+            const topicContent = module?.topics.map(t => `${t.title}: ${t.content}`).join("\n") || "";
+
+            const res = await fetch('/api/admin/quiz/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    topicTitle,
+                    topicContent,
+                    customPrompt: customAIPrompt
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Generation failed");
+
+            if (data.suggestions && data.suggestions.length > 0) {
+                setManualQuizQuestions(data.suggestions);
+                setQuizSuccess("AI suggested questions loaded. You can now edit and synchronize.");
+            } else {
+                throw new Error("AI failed to provide suggestions. Please try again.");
+            }
+        } catch (err: any) {
+            setQuizError(err.message);
+        } finally {
+            setIsGeneratingSuggestions(false);
+        }
+    };
+
 
     if (loading) return (
         <div className="flex items-center justify-center h-screen">
@@ -1039,39 +1225,93 @@ function AdminDashboardContent() {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
-                                    <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-[0.2em] mb-2">Training Buddy Identity</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Name</label>
-                                            <input
-                                                type="text"
-                                                value={newUser.buddyName}
-                                                onChange={(e) => setNewUser({ ...newUser, buddyName: e.target.value })}
-                                                placeholder="BN Admin"
-                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Email</label>
-                                            <input
-                                                type="email"
-                                                value={newUser.buddyEmail}
-                                                onChange={(e) => setNewUser({ ...newUser, buddyEmail: e.target.value })}
-                                                placeholder="admin@email.com"
-                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                            />
-                                        </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Buddy Corporate Phone</label>
-                                            <input
-                                                type="text"
-                                                value={newUser.buddyPhone}
-                                                onChange={(e) => setNewUser({ ...newUser, buddyPhone: e.target.value })}
-                                                placeholder="+91 00000 00000"
-                                                className="w-full bg-white border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold outline-none"
-                                            />
-                                        </div>
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Account Role</label>
+                                    <select
+                                        value={newUser.role}
+                                        onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
+                                        required
+                                    >
+                                        <option value="counsellor">Counsellor</option>
+                                        <option value="product automation">Product Automation</option>
+                                        <option value="tech dev">Tech Dev</option>
+                                        <option value="business devp">Business Devp</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100 lg:col-span-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-[0.2em]">Training Buddy Identities</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewUser(prev => ({ ...prev, buddies: [...prev.buddies, { name: "", email: "", phone: "" }] }))}
+                                            className="px-3 py-1 bg-[#00B6C1]/10 text-[#00B6C1] rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-[#00B6C1] hover:text-white transition-all"
+                                        >
+                                            + Add Another Buddy
+                                        </button>
+                                    </div>
+                                    <div className="space-y-6">
+                                        {newUser.buddies.map((buddy, idx) => (
+                                            <div key={idx} className="p-6 bg-white rounded-xl border border-gray-100 relative group">
+                                                {newUser.buddies.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNewUser(prev => ({ ...prev, buddies: prev.buddies.filter((_, i) => i !== idx) }))}
+                                                        className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <XCircle size={16} />
+                                                    </button>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Buddy Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={buddy.name}
+                                                            onChange={(e) => {
+                                                                const newList = [...newUser.buddies];
+                                                                newList[idx].name = e.target.value;
+                                                                setNewUser({ ...newUser, buddies: newList });
+                                                            }}
+                                                            placeholder="e.g. Anjali M"
+                                                            className="w-full bg-gray-50 border-none rounded-lg py-2 px-4 text-xs font-semibold outline-none"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Buddy Email</label>
+                                                        <input
+                                                            type="email"
+                                                            value={buddy.email}
+                                                            onChange={(e) => {
+                                                                const newList = [...newUser.buddies];
+                                                                newList[idx].email = e.target.value;
+                                                                setNewUser({ ...newUser, buddies: newList });
+                                                            }}
+                                                            placeholder="buddy@balancenutrition.in"
+                                                            className="w-full bg-gray-50 border-none rounded-lg py-2 px-4 text-xs font-semibold outline-none"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Buddy Phone</label>
+                                                        <input
+                                                            type="text"
+                                                            value={buddy.phone}
+                                                            onChange={(e) => {
+                                                                const newList = [...newUser.buddies];
+                                                                newList[idx].phone = e.target.value;
+                                                                setNewUser({ ...newUser, buddies: newList });
+                                                            }}
+                                                            placeholder="+91 00000 00000"
+                                                            className="w-full bg-gray-50 border-none rounded-lg py-2 px-4 text-xs font-semibold outline-none"
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -1135,6 +1375,162 @@ function AdminDashboardContent() {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Quiz Protocol Editor */}
+                            <div className="bg-white p-10 rounded-[3rem] border border-[#0E5858]/5 lg:col-span-2 shadow-sm">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                                    <div>
+                                        <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-2">Protocol Architecture</p>
+                                        <h3 className="text-3xl font-serif text-[#0E5858]">Quiz Protocol Editor</h3>
+                                        <p className="text-xs text-gray-400 font-medium mt-1">Override AI-generated assessments with manual clinical questions.</p>
+                                    </div>
+                                    <div className="flex flex-col gap-2 w-full md:w-auto">
+                                        <select
+                                            value={selectedQuizTopic}
+                                            onChange={(e) => {
+                                                setSelectedQuizTopic(e.target.value);
+                                                handleFetchManualQuiz(e.target.value);
+                                            }}
+                                            className="bg-gray-50 border border-[#0E5858]/10 rounded-xl py-3 px-6 text-sm font-bold outline-none focus:ring-2 focus:ring-[#00B6C1]/10 min-w-[280px]"
+                                        >
+                                            <option value="">Select Module to Edit Quiz</option>
+                                            {syllabusData.filter(m => m.topics.length > 0).map(m => (
+                                                <option key={m.id} value={`MODULE_${m.id}`}>{m.title.split(':')[0]} Final Quiz</option>
+                                            ))}
+                                        </select>
+                                        {isFetchingQuiz && <div className="flex items-center gap-2 px-4 py-1 animate-pulse"><Loader2 size={12} className="animate-spin text-[#00B6C1]" /><span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Loading Protocol...</span></div>}
+                                    </div>
+                                </div>
+
+                                {selectedQuizTopic ? (
+                                    <div className="space-y-8">
+                                        <div className="space-y-6">
+                                            {/* AI Suggestion Bar */}
+                                            <div className="p-8 bg-[#00B6C1]/5 rounded-[2.5rem] border border-[#00B6C1]/10 flex flex-col md:flex-row items-center gap-6">
+                                                <div className="flex-1 space-y-2 w-full">
+                                                    <label className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest ml-4">Custom AI Guidance / Manual Context</label>
+                                                    <input
+                                                        type="text"
+                                                        value={customAIPrompt}
+                                                        onChange={(e) => setCustomAIPrompt(e.target.value)}
+                                                        placeholder="e.g. Focus on PCOS symptoms, include 2 questions on BMI and 1 on diet..."
+                                                        className="w-full bg-white border border-[#00B6C1]/10 rounded-2xl py-4 px-6 text-sm font-medium outline-none shadow-sm focus:ring-2 focus:ring-[#00B6C1]/20"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={handleGenerateAISuggestions}
+                                                    disabled={isGeneratingSuggestions}
+                                                    className="px-10 py-4 bg-[#00B6C1] text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-[#0E5858] transition-all flex items-center justify-center gap-3 shadow-lg shadow-[#00B6C1]/20 min-w-[240px]"
+                                                >
+                                                    {isGeneratingSuggestions ? <Loader2 size={16} className="animate-spin" /> : <><Sparkles size={16} /> Suggest with AI</>}
+                                                </button>
+                                            </div>
+
+                                            {manualQuizQuestions.map((q, qIdx) => (
+
+                                                <div key={qIdx} className="p-8 bg-[#FAFCEE]/50 rounded-[2.5rem] border border-[#0E5858]/5 relative group animate-in slide-in-from-right-4">
+                                                    <button
+                                                        onClick={() => setManualQuizQuestions(prev => prev.filter((_, i) => i !== qIdx))}
+                                                        className="absolute top-6 right-6 p-2 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <XCircle size={20} />
+                                                    </button>
+                                                    <div className="grid grid-cols-1 gap-6">
+                                                        <div className="space-y-2">
+                                                            <label className="text-[9px] font-black text-[#00B6C1] uppercase tracking-widest ml-4">Clinical Question {qIdx + 1}</label>
+                                                            <textarea
+                                                                value={q.question}
+                                                                onChange={e => {
+                                                                    const newList = [...manualQuizQuestions];
+                                                                    newList[qIdx].question = e.target.value;
+                                                                    setManualQuizQuestions(newList);
+                                                                }}
+                                                                placeholder="Enter high-stakes assessment question..."
+                                                                className="w-full bg-white border border-gray-100 rounded-2xl py-4 px-6 text-sm font-medium outline-none h-24 resize-none shadow-sm"
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {q.options.map((opt: string, optIdx: number) => (
+                                                                <div key={optIdx} className="relative">
+                                                                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${q.correctAnswer === opt && opt !== "" ? 'bg-[#00B6C1] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                                        {String.fromCharCode(65 + optIdx)}
+                                                                    </div>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={opt}
+                                                                        onChange={e => {
+                                                                            const newList = [...manualQuizQuestions];
+                                                                            newList[qIdx].options[optIdx] = e.target.value;
+                                                                            setManualQuizQuestions(newList);
+                                                                        }}
+                                                                        placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                                                        className="w-full bg-white border border-gray-100 rounded-xl py-3 pl-14 pr-4 text-xs font-semibold outline-none"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const newList = [...manualQuizQuestions];
+                                                                            newList[qIdx].correctAnswer = opt;
+                                                                            setManualQuizQuestions(newList);
+                                                                        }}
+                                                                        className={`absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black uppercase tracking-widest transition-all ${q.correctAnswer === opt && opt !== "" ? 'text-[#00B6C1]' : 'text-gray-300 hover:text-[#0E5858]'}`}
+                                                                    >
+                                                                        {q.correctAnswer === opt && opt !== "" ? 'Correct' : 'Set Correct'}
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-4">Clinical Justification / Protocol Rationale</label>
+                                                            <input
+                                                                type="text"
+                                                                value={q.justification}
+                                                                onChange={e => {
+                                                                    const newList = [...manualQuizQuestions];
+                                                                    newList[qIdx].justification = e.target.value;
+                                                                    setManualQuizQuestions(newList);
+                                                                }}
+                                                                placeholder="Why is this answer correct in our BN protocol?"
+                                                                className="w-full bg-white border border-orange-100 rounded-xl py-3 px-6 text-xs font-medium outline-none italic text-orange-600 shadow-inner"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                onClick={() => setManualQuizQuestions(prev => [...prev, { question: "", options: ["", "", "", ""], correctAnswer: "", justification: "" }])}
+                                                className="w-full py-6 border-2 border-dashed border-gray-100 rounded-[2.5rem] text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] hover:border-[#00B6C1] hover:text-[#00B6C1] transition-all bg-gray-50/30 flex items-center justify-center gap-3"
+                                            >
+                                                <Plus size={18} /> Add Clinical Assessment Question
+                                            </button>
+                                        </div>
+
+                                        <div className="flex flex-col md:flex-row gap-4 pt-10 border-t border-gray-50">
+                                            <button
+                                                onClick={handleSaveManualQuiz}
+                                                disabled={isSavingQuiz}
+                                                className="flex-1 py-5 bg-[#0E5858] text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] hover:bg-[#00B6C1] transition-all shadow-xl shadow-[#0E5858]/10 flex items-center justify-center gap-2"
+                                            >
+                                                {isSavingQuiz ? <Loader2 size={18} className="animate-spin" /> : <><CheckCircle size={18} /> Synchronize Protocols</>}
+                                            </button>
+                                            <button
+                                                onClick={handleDeleteManualQuiz}
+                                                disabled={isSavingQuiz}
+                                                className="px-8 py-5 border border-red-100 text-red-400 rounded-[1.5rem] font-black text-[9px] uppercase tracking-[0.2em] hover:bg-red-50 transition-all"
+                                            >
+                                                Remove Manual Override
+                                            </button>
+                                        </div>
+                                        {quizSuccess && <p className="text-green-500 font-bold text-[10px] uppercase tracking-widest text-center">{quizSuccess}</p>}
+                                        {quizError && <p className="text-red-500 font-bold text-[10px] uppercase tracking-widest text-center">{quizError}</p>}
+                                    </div>
+                                ) : (
+                                    <div className="py-20 flex flex-col items-center justify-center text-center opacity-20">
+                                        <BrainCircuit size={80} className="text-[#0E5858] mb-6" />
+                                        <p className="text-sm font-serif text-[#0E5858] max-w-xs">Select a syllabus topic above to begin custom protocol mapping.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </motion.div>
                 ) : (
@@ -1144,17 +1540,33 @@ function AdminDashboardContent() {
                                 <h2 className="text-4xl font-serif text-[#0E5858] tracking-tight">Unified Registry</h2>
                                 <p className="text-gray-400 font-medium mt-3 italic text-sm">Full historical searchable directory of all academy members.</p>
                             </div>
-                            <div className="relative w-full lg:w-[400px]">
-                                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" size={18} />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    placeholder="Search by name or email..."
-                                    className="w-full bg-white border border-[#0E5858]/10 rounded-2xl py-4 pl-14 pr-6 text-sm font-medium shadow-sm focus:ring-2 focus:ring-[#00B6C1]/10 outline-none transition-all"
-                                />
+                            <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+                                <button
+                                    onClick={handleCleanupAccounts}
+                                    disabled={isCleaning}
+                                    className={`flex items-center gap-2 px-6 py-4 rounded-2xl border ${isCleaning ? 'bg-gray-100 text-gray-400' : 'bg-white border-red-100 text-red-500 hover:bg-red-50'} transition-all text-[10px] font-black uppercase tracking-widest shadow-sm`}
+                                >
+                                    {isCleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                    {isCleaning ? "Performing Cleanup..." : "Cleanup Registry"}
+                                </button>
+                                <div className="relative w-full lg:w-[400px]">
+                                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" size={18} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        placeholder="Search by name or email..."
+                                        className="w-full bg-white border border-[#0E5858]/10 rounded-2xl py-4 pl-14 pr-6 text-sm font-medium shadow-sm focus:ring-2 focus:ring-[#00B6C1]/10 outline-none transition-all"
+                                    />
+                                </div>
                             </div>
                         </header>
+
+                        {(cleanupSuccess || cleanupError) && (
+                            <div className={`p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-center ${cleanupSuccess ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                {cleanupSuccess || cleanupError}
+                            </div>
+                        )}
 
                         <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-[#0E5858]/5">
                             <div className="overflow-x-auto">
@@ -1205,14 +1617,16 @@ function AdminDashboardContent() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <div className="flex items-center gap-2 group/cred">
-                                                                <Mail size={10} className="text-[#00B6C1]" />
-                                                                <code className="text-[10px] font-mono text-[#0E5858]/60 bg-white px-2 py-0.5 rounded border border-[#0E5858]/5">{p.email}</code>
+                                                        <div className="flex flex-col items-center gap-1.5 min-w-[200px]">
+                                                            <div className="flex items-center gap-2 group/cred w-full justify-center">
+                                                                <Mail size={12} className="text-[#00B6C1]" />
+                                                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter w-12 text-right">Login ID</span>
+                                                                <code className="text-[10px] font-mono text-[#0E5858] bg-white px-3 py-1 rounded-lg border border-[#0E5858]/10 shadow-sm flex-1 text-center font-bold">{p.email}</code>
                                                             </div>
-                                                            <div className="flex items-center gap-2 group/cred">
-                                                                <BNKeyIcon size={10} className="text-orange-400" />
-                                                                <code className="text-[10px] font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">{p.temp_password || '515148'}</code>
+                                                            <div className="flex items-center gap-2 group/cred w-full justify-center">
+                                                                <BNKeyIcon size={12} className="text-orange-400" />
+                                                                <span className="text-[10px] font-black uppercase text-orange-400 tracking-tighter w-12 text-right">Access</span>
+                                                                <code className="text-[10px] font-mono text-orange-700 bg-orange-50 px-3 py-1 rounded-lg border border-orange-100 shadow-sm flex-1 text-center font-bold tracking-widest">{p.temp_password || 'LEGACY_USER'}</code>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1243,8 +1657,11 @@ function AdminDashboardContent() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6">
-                                                        <span className={`px-3 py-1 text-[8px] font-black uppercase rounded-lg border ${p.role === 'admin' ? 'bg-teal-50 text-teal-600 border-teal-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
-                                                            {p.role}
+                                                        <span className={`px-4 py-1 text-[9px] font-black uppercase rounded-full border shadow-sm tracking-widest ${p.role === 'admin' ? 'bg-[#0E5858] text-white border-[#0E5858]' :
+                                                            p.role === 'mentor' ? 'bg-[#00B6C1]/10 text-[#00B6C1] border-[#00B6C1]/20' :
+                                                                'bg-gray-50 text-gray-500 border-gray-100'
+                                                            }`}>
+                                                            {p.role === 'mentor' ? 'Counsellor' : p.role}
                                                         </span>
                                                     </td>
                                                     <td className="px-8 text-right">

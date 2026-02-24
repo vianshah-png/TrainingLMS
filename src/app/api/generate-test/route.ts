@@ -1,11 +1,35 @@
 import { NextResponse } from 'next/server';
 import { groq } from '@/lib/groq';
 import { encryptData } from '@/lib/encryption';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function POST(req: Request) {
 
     try {
-        const { topicTitle, topicContent, topicLinks } = await req.json();
+        const { topicTitle, topicContent, topicLinks, topicCode } = await req.json();
+
+        // CHECK FOR MANUAL OVERRIDE
+        if (topicCode) {
+            const { data: manualQuiz } = await supabaseAdmin
+                .from('admin_quizzes')
+                .select('*')
+                .eq('topic_code', topicCode)
+                .single();
+
+            if (manualQuiz && manualQuiz.questions && Array.isArray(manualQuiz.questions)) {
+                const testData = manualQuiz.questions;
+                const scoringKey = testData.map((q: any) => ({
+                    correctAnswer: q.correctAnswer,
+                    justification: q.justification
+                }));
+                const answerToken = encryptData(scoringKey);
+                const clientQuestions = testData.map((q: any) => ({
+                    question: q.question,
+                    options: q.options
+                }));
+                return NextResponse.json({ questions: clientQuestions, answerToken });
+            }
+        }
 
         const chatCompletion = await groq.chat.completions.create({
             messages: [
