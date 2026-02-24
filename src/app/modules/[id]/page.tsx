@@ -4,7 +4,6 @@ import {
     BookOpen,
     ExternalLink,
     CheckCircle,
-    Clock,
     User,
     Sparkles,
     ChevronRight,
@@ -684,10 +683,10 @@ export default function ModulePage() {
                     <div className="space-y-8">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-white/10 rounded-2xl"><Clock size={20} /></div>
-                                <span className="text-sm font-medium">Estimated Time</span>
+                                <div className="p-3 bg-white/10 rounded-2xl"><BookOpen size={20} /></div>
+                                <span className="text-sm font-medium">Total Sections</span>
                             </div>
-                            <span className="text-lg font-serif">2.5 Hours</span>
+                            <span className="text-lg font-serif">{moduleTopics.length}</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">

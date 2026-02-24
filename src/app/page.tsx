@@ -42,6 +42,7 @@ export default function Home() {
   const [allMentors, setAllMentors] = useState<any[]>([]);
   const [showBuddyModal, setShowBuddyModal] = useState(false);
 
+
   useEffect(() => {
     const fetchPersonalStats = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -193,6 +194,7 @@ export default function Home() {
       }
       setLastModule(targetModule);
 
+
       setLoading(false);
     };
     fetchPersonalStats();
@@ -218,6 +220,7 @@ export default function Home() {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
+
 
   return (
     <main className="min-h-screen bg-[#FAFCEE] p-6 lg:p-12 relative overflow-hidden">
@@ -282,6 +285,7 @@ export default function Home() {
                 <p className="text-lg font-serif text-[#0E5858]">{userStats.quizzes}</p>
               </div>
             </div>
+
           </motion.div>
         </header>
 

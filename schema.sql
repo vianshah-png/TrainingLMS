@@ -27,4 +27,41 @@ CREATE POLICY "Authenticated users can read admin_quizzes"
 ON admin_quizzes 
 FOR SELECT 
 TO authenticated 
-USING (true);
+
+-- Table to store admin notifications sent to counsellors
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT DEFAULT 'info', -- 'info', 'warning', 'alert'
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Allow admins to send notifications
+CREATE POLICY "Admins have full access to notifications" 
+ON notifications 
+FOR ALL 
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE profiles.id = auth.uid() 
+    AND profiles.role = 'admin'
+  )
+);
+
+-- Allow users to read their own notifications
+CREATE POLICY "Users can read their own notifications" 
+ON notifications 
+FOR SELECT 
+USING (auth.uid() = user_id);
+
+-- Allow users to mark notifications as read
+CREATE POLICY "Users can update their own notifications" 
+ON notifications 
+FOR UPDATE 
+USING (auth.uid() = user_id);

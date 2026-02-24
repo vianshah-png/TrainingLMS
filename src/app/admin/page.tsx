@@ -45,7 +45,8 @@ import {
     CheckCircle,
     Star,
     Layout,
-    Sparkles
+    Sparkles,
+    Bell
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -184,6 +185,15 @@ function AdminDashboardContent() {
     const [quizError, setQuizError] = useState("");
     const [customAIPrompt, setCustomAIPrompt] = useState("");
     const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+
+    // Notification States
+    const [notificationForm, setNotificationForm] = useState({
+        title: "",
+        message: "",
+        type: "info" as "info" | "warning" | "alert"
+    });
+    const [sendingNotification, setSendingNotification] = useState(false);
+    const [notificationSuccess, setNotificationSuccess] = useState("");
 
 
     useEffect(() => {
@@ -494,6 +504,15 @@ function AdminDashboardContent() {
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError || !session) throw new Error('Session expired. Please log in again.');
 
+            // Pre-cleanup: delete related data to avoid foreign key issues
+            await Promise.all([
+                supabase.from('mentor_activity_logs').delete().eq('user_id', selectedProfile.id),
+                supabase.from('mentor_progress').delete().eq('user_id', selectedProfile.id),
+                supabase.from('assessment_logs').delete().eq('user_id', selectedProfile.id),
+                supabase.from('summary_audits').delete().eq('user_id', selectedProfile.id),
+                supabase.from('notifications').delete().eq('user_id', selectedProfile.id)
+            ]);
+
             const res = await fetch('/api/admin/delete-user', {
                 method: 'POST',
                 headers: {
@@ -503,13 +522,14 @@ function AdminDashboardContent() {
                 body: JSON.stringify({ userId: selectedProfile.id })
             });
 
-            if (!res.ok) throw new Error("Deletion failed");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Deletion failed");
 
             alert("Account permanently removed.");
             setSelectedProfile(null);
             refreshData();
         } catch (err: any) {
-            alert(err.message);
+            alert("Delete failed: " + err.message);
         } finally {
             setIsDeleting(false);
             setDeleteConfirm("");
@@ -596,6 +616,70 @@ function AdminDashboardContent() {
         }
     };
 
+    const handleSendNotification = async (userId: string) => {
+        if (!notificationForm.title || !notificationForm.message) return;
+        setSendingNotification(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Session expired");
+
+            const res = await fetch('/api/admin/notifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    userId,
+                    ...notificationForm
+                })
+            });
+
+            if (!res.ok) throw new Error("Failed to send notification");
+            setNotificationSuccess("Notification dispatched successfully.");
+            setNotificationForm({ title: "", message: "", type: "info" });
+            setTimeout(() => setNotificationSuccess(""), 3000);
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSendingNotification(false);
+        }
+    };
+
+    const NOTIFICATION_TEMPLATES = [
+        {
+            id: 'feedback',
+            label: 'LMS Feedback',
+            title: 'Share Your LMS Experience',
+            message: 'Hello! We hope your training is going well. Please share your feedback on the LMS platform to help us improve your learning experience.',
+            type: 'info'
+        },
+        {
+            id: 'inactivity',
+            label: 'Inactivity Detected',
+            title: 'Action Required: Inactivity Detected',
+            message: 'We noticed you haven\'t logged in for a few days. Consistency is key to mastering the BN protocols! Please resume your training modules today.',
+            type: 'warning'
+        },
+        {
+            id: 'training-time',
+            label: 'Training Time Remaining',
+            title: 'Final Stretch: Training Completion',
+            message: 'You have only a few days left to complete your assigned training modules. Please ensure all quizzes and assignments are submitted on time.',
+            type: 'alert'
+        }
+    ];
+
+    const handleApplyTemplate = (tempId: string) => {
+        const template = NOTIFICATION_TEMPLATES.find(t => t.id === tempId);
+        if (template) {
+            setNotificationForm({
+                title: template.title,
+                message: template.message,
+                type: template.type as any
+            });
+        }
+    };
     const handleGenerateAISuggestions = async () => {
         if (!selectedQuizTopic) return;
         setIsGeneratingSuggestions(true);
@@ -605,12 +689,19 @@ function AdminDashboardContent() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Session expired. Please log in again.");
 
-            // Find topic title and content from syllabus
+            // Find topic title and content from syllabus + dynamic content
             const topicId = selectedQuizTopic.replace("MODULE_", "");
             const module = syllabusData.find(m => m.id === topicId);
             const topicTitle = module?.title || "Unknown Topic";
-            // We'll use a summary of topics as content since it's a "Module" quiz
-            const topicContent = module?.topics.map(t => `${t.title}: ${t.content}`).join("\n") || "";
+
+            // Static content + Dynamic content
+            const staticContent = module?.topics.map(t => `${t.title}: ${t.content}`).join("\n") || "";
+            const moduleDynamicContent = dynamicContent
+                .filter(d => d.module_id === topicId)
+                .map(d => `${d.title}: ${d.content}`)
+                .join("\n");
+
+            const topicContent = `${staticContent}\n${moduleDynamicContent}`.trim();
 
             const res = await fetch('/api/admin/quiz/suggestions', {
                 method: 'POST',
@@ -621,7 +712,8 @@ function AdminDashboardContent() {
                 body: JSON.stringify({
                     topicTitle,
                     topicContent,
-                    customPrompt: customAIPrompt
+                    customPrompt: customAIPrompt,
+                    existingQuestions: manualQuizQuestions
                 })
             });
             const data = await res.json();
@@ -922,6 +1014,75 @@ function AdminDashboardContent() {
                                             {submittingAudit ? <Loader2 size={16} className="animate-spin" /> : <><Plus size={16} /> Submit Audit Report</>}
                                         </button>
                                     </form>
+                                </div>
+
+                                <div className="bg-white rounded-[3rem] p-10 border border-[#0E5858]/5 shadow-sm space-y-8">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-sm font-black uppercase tracking-[0.2em] text-[#0E5858]">Send Notification</h4>
+                                        <Bell size={20} className="text-[#00B6C1]" />
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {NOTIFICATION_TEMPLATES.map(temp => (
+                                            <button
+                                                key={temp.id}
+                                                onClick={() => handleApplyTemplate(temp.id)}
+                                                className="px-3 py-1.5 bg-[#FAFCEE] border border-[#0E5858]/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-[#0E5858] hover:bg-[#00B6C1] hover:text-white transition-all shadow-sm"
+                                            >
+                                                {temp.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Notification Title</label>
+                                            <input
+                                                type="text"
+                                                value={notificationForm.title}
+                                                onChange={e => setNotificationForm({ ...notificationForm, title: e.target.value })}
+                                                className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:ring-2 focus:ring-[#00B6C1]/10 transition-all font-serif"
+                                                placeholder="Enter title..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Message Body</label>
+                                            <textarea
+                                                value={notificationForm.message}
+                                                onChange={e => setNotificationForm({ ...notificationForm, message: e.target.value })}
+                                                className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 px-4 text-xs font-medium outline-none focus:ring-2 focus:ring-[#00B6C1]/10 transition-all h-32 resize-none"
+                                                placeholder="Type your message here..."
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-4">
+                                            {(['info', 'warning', 'alert'] as const).map(t => (
+                                                <button
+                                                    key={t}
+                                                    type="button"
+                                                    onClick={() => setNotificationForm({ ...notificationForm, type: t })}
+                                                    className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg border transition-all ${notificationForm.type === t
+                                                        ? t === 'alert' ? 'bg-red-500 text-white border-red-500 shadow-md' : t === 'warning' ? 'bg-orange-400 text-white border-orange-400 shadow-md' : 'bg-[#00B6C1] text-white border-[#00B6C1] shadow-md'
+                                                        : 'bg-white text-gray-400 border-gray-100'
+                                                        }`}
+                                                >
+                                                    {t}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {notificationSuccess && (
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-green-500 text-center animate-pulse">{notificationSuccess}</p>
+                                        )}
+
+                                        <button
+                                            onClick={() => handleSendNotification(selectedProfile.id)}
+                                            disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                                            className="w-full py-4 bg-[#0E5858] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00B6C1] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#0E5858]/10"
+                                        >
+                                            {sendingNotification ? <Loader2 size={16} className="animate-spin" /> : <><Bell size={16} /> Dispatch Message</>}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1422,7 +1583,14 @@ function AdminDashboardContent() {
                                                     disabled={isGeneratingSuggestions}
                                                     className="px-10 py-4 bg-[#00B6C1] text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-[#0E5858] transition-all flex items-center justify-center gap-3 shadow-lg shadow-[#00B6C1]/20 min-w-[240px]"
                                                 >
-                                                    {isGeneratingSuggestions ? <Loader2 size={16} className="animate-spin" /> : <><Sparkles size={16} /> Suggest with AI</>}
+                                                    {isGeneratingSuggestions ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <Sparkles size={16} />
+                                                            {manualQuizQuestions.length > 0 ? "Refine with AI" : "Suggest with AI"}
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
 
@@ -1459,8 +1627,13 @@ function AdminDashboardContent() {
                                                                         type="text"
                                                                         value={opt}
                                                                         onChange={e => {
+                                                                            const oldVal = opt;
+                                                                            const newVal = e.target.value;
                                                                             const newList = [...manualQuizQuestions];
-                                                                            newList[qIdx].options[optIdx] = e.target.value;
+                                                                            newList[qIdx].options[optIdx] = newVal;
+                                                                            if (newList[qIdx].correctAnswer === oldVal) {
+                                                                                newList[qIdx].correctAnswer = newVal;
+                                                                            }
                                                                             setManualQuizQuestions(newList);
                                                                         }}
                                                                         placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
@@ -1608,7 +1781,12 @@ function AdminDashboardContent() {
                                                                                         {lastAct.activity_type.replace('_', ' ')}: {lastAct.content_title}
                                                                                     </p>
                                                                                 </div>
-                                                                                <p className="text-[6px] font-black text-gray-300 uppercase tracking-widest pl-2.5">+{userAct.length - 1} other actions</p>
+                                                                                <div className="flex items-center gap-2 pl-2.5">
+                                                                                    <Clock size={8} className="text-gray-300" />
+                                                                                    <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">{new Date(lastAct.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</p>
+                                                                                    <span className="text-[6px] text-gray-200">|</span>
+                                                                                    <p className="text-[6px] font-black text-gray-300 uppercase tracking-widest">+{userAct.length - 1} actions</p>
+                                                                                </div>
                                                                             </div>
                                                                         );
                                                                     })()}

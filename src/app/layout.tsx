@@ -3,8 +3,8 @@
 import { Playfair_Display, Outfit } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
-import { useState, useEffect } from "react";
-import { Bell, LogOut, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Bell, LogOut, Loader2, Inbox } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Analytics } from "@vercel/analytics/react";
@@ -36,6 +36,11 @@ export default function RootLayout({
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("interviewee");
 
+  // Notification state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -56,6 +61,14 @@ export default function RootLayout({
           role: role
         });
 
+        // Fetch notifications
+        const { data: notifs } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+        setNotifications(notifs || []);
+
         if (isLoginPage) {
           if (role === 'admin') {
             router.push("/admin");
@@ -63,7 +76,6 @@ export default function RootLayout({
             router.push("/");
           }
         } else if (pathname.startsWith('/admin') && role !== 'admin') {
-          // Access control: non-admins cannot access admin routes
           router.push("/");
         }
       } else if (!isLoginPage) {
@@ -83,6 +95,14 @@ export default function RootLayout({
         setUserEmail(session.user.email || '');
         setUserRole(role);
 
+        // Fetch notifications on sign in
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .then(({ data }) => setNotifications(data || []));
+
         if (isLoginPage) {
           if (role === 'admin') {
             router.push("/admin");
@@ -91,17 +111,28 @@ export default function RootLayout({
           }
         }
       } else if (event === 'SIGNED_OUT') {
-
         setIsAuthenticated(false);
         setUserName("Counsellor");
         setUserEmail("");
         setUserRole("interviewee");
+        setNotifications([]);
         router.push("/login");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [isLoginPage, router]);
+  }, [isLoginPage, router, pathname]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -109,6 +140,18 @@ export default function RootLayout({
     setUserRole("interviewee");
     router.push("/login");
   };
+
+  const markNotificationRead = async (id: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id);
+    if (!error) {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Show nothing until auth is checked to prevent flickering
   if (!isAuthChecked) {
@@ -167,10 +210,67 @@ export default function RootLayout({
               </div>
 
               <div className="flex items-center gap-6">
-                <button className="relative p-2 text-[#0E5858]/60 hover:text-[#0E5858] transition-colors">
-                  <Bell size={22} />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-[#FFCC00] rounded-full ring-2 ring-[#FAFCEE]"></span>
-                </button>
+                {/* Notification Bell with Dropdown */}
+                <div className="relative" ref={notifRef}>
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`relative p-2 transition-colors ${showNotifications ? 'text-[#00B6C1]' : 'text-[#0E5858]/60 hover:text-[#0E5858]'}`}
+                  >
+                    <Bell size={22} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full ring-2 ring-[#FAFCEE] flex items-center justify-center">
+                        <span className="text-[8px] font-black text-white leading-none">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotifications && (
+                    <div className="absolute top-12 right-0 w-[360px] bg-white rounded-3xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                      <div className="p-5 border-b border-gray-50 flex justify-between items-center">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-[#0E5858]">Notifications</h4>
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <span className="text-[8px] font-black uppercase tracking-widest text-[#00B6C1] bg-[#00B6C1]/10 px-2 py-0.5 rounded-full">{unreadCount} new</span>
+                          )}
+                          <Inbox size={14} className="text-gray-300" />
+                        </div>
+                      </div>
+
+                      <div className="max-h-[400px] overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map(notify => (
+                            <div
+                              key={notify.id}
+                              onClick={() => !notify.is_read && markNotificationRead(notify.id)}
+                              className={`px-5 py-4 border-b border-gray-50 transition-all cursor-pointer hover:bg-gray-50/50 ${!notify.is_read
+                                  ? `border-l-4 ${notify.type === 'alert' ? 'border-l-red-500 bg-red-50/20' :
+                                    notify.type === 'warning' ? 'border-l-orange-400 bg-orange-50/20' :
+                                      'border-l-[#00B6C1] bg-[#00B6C1]/5'
+                                  }`
+                                  : ''
+                                }`}
+                            >
+                              <div className="flex justify-between items-start mb-1">
+                                <h5 className="text-[11px] font-bold text-[#0E5858] leading-tight pr-2">{notify.title}</h5>
+                                <p className="text-[7px] font-black text-gray-300 uppercase shrink-0">
+                                  {new Date(notify.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </p>
+                              </div>
+                              <p className="text-[10px] text-gray-500 leading-relaxed font-medium">{notify.message}</p>
+                              {!notify.is_read && <div className="mt-2 w-1.5 h-1.5 rounded-full bg-[#00B6C1]"></div>}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-16 text-center">
+                            <Inbox size={32} className="text-gray-200 mx-auto mb-4" />
+                            <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">All caught up!</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleLogout}
                   className="p-2 text-[#0E5858]/40 hover:text-red-500 transition-colors group relative"
