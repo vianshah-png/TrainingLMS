@@ -61,6 +61,8 @@ export default function ModulePage() {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editedTopics, setEditedTopics] = useState<Record<string, Partial<any>>>({});
     const [isSavingEdits, setIsSavingEdits] = useState(false);
+    const [dragItem, setDragItem] = useState<number | null>(null);
+    const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
     const handleTopicEdit = (topicCode: string, updatedFields: Partial<any>) => {
         setEditedTopics(prev => ({
@@ -72,32 +74,74 @@ export default function ModulePage() {
         setModuleTopics(prev => prev.map(t => t.code === topicCode ? { ...t, ...updatedFields } : t));
     };
 
+    // Drag-and-drop reorder handler (admin edit mode)
+    const handleDragEnd = async () => {
+        if (dragItem === null || dragOverItem === null || dragItem === dragOverItem) {
+            setDragItem(null);
+            setDragOverItem(null);
+            return;
+        }
+        const reordered = [...moduleTopics];
+        const dragged = reordered.splice(dragItem, 1)[0];
+        reordered.splice(dragOverItem, 0, dragged);
+        setModuleTopics(reordered);
+        setDragItem(null);
+        setDragOverItem(null);
+        // Persist new sort_order to DB
+        try {
+            for (let i = 0; i < reordered.length; i++) {
+                await supabase.from('syllabus_content').upsert({
+                    module_id: moduleId,
+                    topic_code: reordered[i].code,
+                    sort_order: i,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'topic_code' });
+            }
+        } catch (e) {
+            console.error('Failed to save sort order:', e);
+        }
+    };
+
     const handleSaveEdits = async () => {
         setIsSavingEdits(true);
+        const errors: string[] = [];
         try {
-            const updates = Object.keys(editedTopics).map(topicCode => {
+            for (const topicCode of Object.keys(editedTopics)) {
                 const edits = editedTopics[topicCode];
-                return {
+                // Fetch the existing row so we don't wipe other fields
+                const { data: existing } = await supabase
+                    .from('syllabus_content')
+                    .select('*')
+                    .eq('topic_code', topicCode)
+                    .single();
+
+                const payload: any = {
                     module_id: moduleId,
                     topic_code: topicCode,
-                    title: edits.title,
-                    content: edits.content,
-                    links: edits.links,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    ...(existing || {}),
                 };
-            });
+                if (edits.title !== undefined) payload.title = edits.title;
+                if (edits.content !== undefined) payload.content = edits.content;
+                if (edits.links !== undefined) payload.links = edits.links;
 
-            for (const update of updates) {
-                const { error } = await supabase.from('syllabus_content').upsert(update, { onConflict: 'topic_code' });
-                if (error) throw error;
+                const { error } = await supabase
+                    .from('syllabus_content')
+                    .upsert(payload, { onConflict: 'topic_code' });
+
+                if (error) errors.push(`${topicCode}: ${error.message}`);
             }
 
-            setIsEditMode(false);
-            setEditedTopics({});
-            alert('Changes saved successfully!');
-        } catch (e) {
+            if (errors.length > 0) {
+                alert(`Saved with some errors:\n${errors.join('\n')}`);
+            } else {
+                setIsEditMode(false);
+                setEditedTopics({});
+                alert('All changes saved successfully!');
+            }
+        } catch (e: any) {
             console.error(e);
-            alert('Failed to save changes.');
+            alert(`Save failed: ${e?.message || 'Unknown error'}`);
         } finally {
             setIsSavingEdits(false);
         }
@@ -418,7 +462,7 @@ export default function ModulePage() {
                                 <ul className="space-y-3">
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
-                                        <span>Time Limit: 10 Minutes to complete all questions.</span>
+                                        <span>Time Limit: 15 Minutes to complete all questions.</span>
                                     </li>
                                     <li className="flex gap-3 text-xs font-bold text-[#0E5858]/70">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00B6C1] mt-1.5"></div>
@@ -704,6 +748,7 @@ export default function ModulePage() {
                 </motion.div>
             </header>
 
+
             <div className="space-y-6">
                 <h3 className="text-2xl font-serif text-[#0E5858] mb-6 flex items-center gap-4">
                     The Syllabus Breakdown
@@ -712,25 +757,48 @@ export default function ModulePage() {
 
                 {moduleTopics.length > 0 ? (
                     moduleTopics.map((topic, index) => (
-                        <TopicCard
+                        <div
                             key={topic.code}
-                            topic={topic}
-                            index={index}
-                            isCompleted={completedTopics.includes(topic.code)}
-                            onToggleComplete={() => toggleTopic(topic.code)}
-                            onMoveNext={(justDoneCode) => {
-                                const nextTopic = moduleTopics[index + 1];
-                                if (nextTopic) {
-                                    document.getElementById(`topic-${nextTopic.code}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                } else {
-                                    handleContinue(justDoneCode);
-                                }
-                            }}
-                            isLastTopic={index === moduleTopics.length - 1}
-                            userId={userId}
-                            isEditMode={isEditMode}
-                            onEdit={(updatedFields) => handleTopicEdit(topic.code, updatedFields)}
-                        />
+                            draggable={isEditMode}
+                            onDragStart={() => setDragItem(index)}
+                            onDragEnter={() => setDragOverItem(index)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => e.preventDefault()}
+                            className={`relative transition-all duration-200 ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''
+                                } ${dragOverItem === index && dragItem !== index
+                                    ? 'ring-2 ring-[#00B6C1] ring-offset-2 rounded-[2.5rem] scale-[1.01]'
+                                    : ''
+                                }`}
+                        >
+                            {isEditMode && (
+                                <div className="absolute -left-10 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1 opacity-40 hover:opacity-100 transition-opacity cursor-grab">
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                    <div className="w-1.5 h-1.5 bg-[#0E5858] rounded-full"></div>
+                                </div>
+                            )}
+                            <TopicCard
+                                topic={topic}
+                                index={index}
+                                isCompleted={completedTopics.includes(topic.code)}
+                                onToggleComplete={() => toggleTopic(topic.code)}
+                                onMoveNext={(justDoneCode) => {
+                                    const nextTopic = moduleTopics[index + 1];
+                                    if (nextTopic) {
+                                        document.getElementById(`topic-${nextTopic.code}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    } else {
+                                        handleContinue(justDoneCode);
+                                    }
+                                }}
+                                isLastTopic={index === moduleTopics.length - 1}
+                                userId={userId}
+                                isEditMode={isEditMode}
+                                onEdit={(updatedFields) => handleTopicEdit(topic.code, updatedFields)}
+                            />
+                        </div>
                     ))
                 ) : (
                     <div className="premium-card p-20 text-center flex flex-col items-center">
@@ -809,6 +877,42 @@ export default function ModulePage() {
                 )}
             </div>
 
+            {moduleId === 'module-1' && (
+                <section className="mt-24 mb-10">
+                    <div className="flex items-center gap-6 mb-12">
+                        <div className="w-1.5 h-10 bg-[#00B6C1] rounded-full"></div>
+                        <div>
+                            <h3 className="text-3xl font-serif text-[#0E5858]">BN Ecosystem Hub</h3>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Cross-Platform Resource Deep Links</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[
+                            { title: "BN Shop", url: "https://www.balancenutrition.in/shop", desc: "E-Commerce & Product Inventory", icon: ShoppingBag, color: "#FFCC00" },
+                            { title: "Nutripreneur", url: "https://nutripreneur.balancenutrition.in/", desc: "Entrepreneurial Learning Platform", icon: Target, color: "#00B6C1" },
+                            { title: "BN Franchise", url: "https://bnlifecentre.balancenutrition.in/#", desc: "Life Centre & Franchise Operations", icon: Globe, color: "#0E5858" },
+                            { title: "BN Health", url: "#", desc: "Diagnostics & Doctors Network", icon: Activity, color: "#FF5733", isPopup: true },
+                            { title: "Corporate Wellness", url: "https://drive.google.com/file/d/1YC6Yoz4NSgTsMr65hkc4fHtKApPI3xgM/view?usp=drive_link", desc: "Enterprise Health Partnerships", icon: Building2, color: "#8E44AD" },
+                            { title: "Educational Institute", url: "https://drive.google.com/drive/folders/18NQXel0C-rHSOX9TdTo20liyE67jjz-5?usp=sharing", desc: "Student & Academic Health Programs", icon: School, color: "#27AE60" }
+                        ].map((link, i) => (
+                            <motion.a
+                                key={i} href={link.url} target={link.isPopup ? undefined : "_blank"}
+                                onClick={(e) => { if (link.isPopup) { e.preventDefault(); setShowHealthPopup(true); } }}
+                                whileHover={{ y: -8, scale: 1.02 }}
+                                className="premium-card p-8 group relative overflow-hidden flex flex-col items-center text-center hover:border-[#00B6C1]/30 transition-all border border-transparent bg-white shadow-xl"
+                            >
+                                <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-xl transition-all group-hover:rotate-12" style={{ backgroundColor: `${link.color}15`, color: link.color }}>
+                                    <link.icon size={28} />
+                                </div>
+                                <h4 className="text-xl font-serif font-bold text-[#0E5858] mb-2">{link.title}</h4>
+                                <p className="text-xs text-gray-400 leading-relaxed px-4 font-medium">{link.desc}</p>
+                                <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] opacity-0 group-hover:opacity-100 transition-all">Launch Platform <ArrowRight size={14} /></div>
+                            </motion.a>
+                        ))}
+                    </div>
+                </section>
+            )}
+
             {moduleTopics.length > 0 && completedTopics.length === moduleTopics.length && (
                 <motion.section
                     initial={{ opacity: 0, y: 40 }}
@@ -878,42 +982,6 @@ export default function ModulePage() {
                         </div>
                     </div>
                 </motion.section>
-            )}
-
-            {moduleId === 'module-1' && (
-                <section className="mt-24 mb-10">
-                    <div className="flex items-center gap-6 mb-12">
-                        <div className="w-1.5 h-10 bg-[#00B6C1] rounded-full"></div>
-                        <div>
-                            <h3 className="text-3xl font-serif text-[#0E5858]">BN Ecosystem Hub</h3>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Cross-Platform Resource Deep Links</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {[
-                            { title: "BN Shop", url: "https://www.balancenutrition.in/shop", desc: "E-Commerce & Product Inventory", icon: ShoppingBag, color: "#FFCC00" },
-                            { title: "Nutripreneur", url: "https://nutripreneur.balancenutrition.in/", desc: "Entrepreneurial Learning Platform", icon: Target, color: "#00B6C1" },
-                            { title: "BN Franchise", url: "https://bnlifecentre.balancenutrition.in/#", desc: "Life Centre & Franchise Operations", icon: Globe, color: "#0E5858" },
-                            { title: "BN Health", url: "#", desc: "Diagnostics & Doctors Network", icon: Activity, color: "#FF5733", isPopup: true },
-                            { title: "Corporate Wellness", url: "https://drive.google.com/file/d/1YC6Yoz4NSgTsMr65hkc4fHtKApPI3xgM/view?usp=drive_link", desc: "Enterprise Health Partnerships", icon: Building2, color: "#8E44AD" },
-                            { title: "Educational Institute", url: "https://drive.google.com/drive/folders/18NQXel0C-rHSOX9TdTo20liyE67jjz-5?usp=sharing", desc: "Student & Academic Health Programs", icon: School, color: "#27AE60" }
-                        ].map((link, i) => (
-                            <motion.a
-                                key={i} href={link.url} target={link.isPopup ? undefined : "_blank"}
-                                onClick={(e) => { if (link.isPopup) { e.preventDefault(); setShowHealthPopup(true); } }}
-                                whileHover={{ y: -8, scale: 1.02 }}
-                                className="premium-card p-8 group relative overflow-hidden flex flex-col items-center text-center hover:border-[#00B6C1]/30 transition-all border border-transparent bg-white shadow-xl"
-                            >
-                                <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-xl transition-all group-hover:rotate-12" style={{ backgroundColor: `${link.color}15`, color: link.color }}>
-                                    <link.icon size={28} />
-                                </div>
-                                <h4 className="text-xl font-serif font-bold text-[#0E5858] mb-2">{link.title}</h4>
-                                <p className="text-xs text-gray-400 leading-relaxed px-4 font-medium">{link.desc}</p>
-                                <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] opacity-0 group-hover:opacity-100 transition-all">Launch Platform <ArrowRight size={14} /></div>
-                            </motion.a>
-                        ))}
-                    </div>
-                </section>
             )}
 
             <footer className="mt-32 pt-16 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">

@@ -66,10 +66,10 @@ export const syllabusData: Module[] = [
                 layout: 'grid',
                 links: [
                     { label: 'BN Website', url: 'https://www.balancenutrition.in/' },
-                    { label: 'Cleanse', url: 'https://bncleanse.com/' },
+                    { label: 'BNCleanse', url: 'https://bncleanse.com/' },
                     { label: 'BN Recipes', icon: 'target', url: 'https://www.balancenutrition.in/recipes' },
                     { label: 'BN Health Reads', icon: 'globe', url: 'https://www.balancenutrition.in/health-reads' },
-                    { label: 'BN Health Score', icon: 'activity', url: 'https://www.balancenutrition.in/health-score' }
+                    { label: 'BN Health', icon: 'activity', url: 'https://www.balancenutrition.in/health-score' }
                 ]
             },
             {
@@ -117,7 +117,9 @@ export const syllabusData: Module[] = [
                 code: 'M2-01',
                 title: 'How We Work',
                 content: 'Video explaining the complete client journey from purchase to completion.',
-                links: [{ label: 'How We Work Video', url: 'https://youtu.be/WpaY3G9RGyY' }]
+                links: [{ label: 'How We Work Video', url: 'https://youtu.be/WpaY3G9RGyY' },
+                { label: 'Glossary', url: 'https://docs.google.com/spreadsheets/d/1gemc5b7d-UsGNfIoQTGuh2FkslabYmPmp_ybznjxGSA/edit?gid=1915602987#gid=1915602987' }
+                ]
             },
             {
                 code: 'M2-02',
@@ -215,7 +217,7 @@ export const syllabusData: Module[] = [
                     { label: 'Wallet Money Doc', url: 'https://docs.google.com/spreadsheets/d/1X9T8TJw9UX7AtdNiZrRUA_pvQYRM8AMd5Fu1kuozISo/edit?gid=0#gid=0' },
                     { label: 'WhatsApp Dos and Donts', url: 'https://drive.google.com/file/d/1fFUtJPGTBb_cLVGizvC4EwtKNOh23vDG/view' },
                     { label: 'Lead Conversion (Consultation) Training by Krishna', url: 'https://us06web.zoom.us/rec/play/tH49jQn_4nKfmAaHkjtYZD1BbE7XhVjxiMBK4qsp3PG_HHiPT24Q6Gbkmv9l1duLFczNqgJHrST8I0t-.hFkYNmkz4w3CAw5V?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2FFGUqZ4uRA8jnB-HXnKYReWXxUrCrpYB64UlBhHzjjVOfCpYilXKpJnSFoL8Q2yh1.rn_6BNdfPwOc10XD' },
-                    { label: 'Glossary Link', url: 'https://docs.google.com/spreadsheets/d/1m5IlL63e0Vs4mAEf2f4Z8ZIKYhJKQdpyw6wY83Hy1RU/edit?gid=55263542#gid=55263542' }
+                    { label: 'Glossary Link', url: 'https://docs.google.com/spreadsheets/d/1gemc5b7d-UsGNfIoQTGuh2FkslabYmPmp_ybznjxGSA/edit?gid=1915602987#gid=1915602987' }
                 ]
             },
             {

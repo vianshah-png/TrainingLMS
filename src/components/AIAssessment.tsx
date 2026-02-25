@@ -28,7 +28,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
     const [answers, setAnswers] = useState<string[]>([]);
     const [showResult, setShowResult] = useState(false);
     const [finalScoreStats, setFinalScoreStats] = useState<{ score: number, total: number, results?: any[] } | null>(null);
-    const [timeLeft, setTimeLeft] = useState(600); // 10 minutes default
+    const [timeLeft, setTimeLeft] = useState(900); // 15 minutes
 
     useEffect(() => {
         if (!questions || showResult) return;
@@ -77,7 +77,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
             setCurrentStep(0);
             setAnswers(new Array(fetchedQuestions.length).fill(""));
             setShowResult(false);
-            setTimeLeft(600); // Reset timer
+            setTimeLeft(900); // Reset timer to 15 minutes
         } catch (error) {
             console.error("Error generating test:", error);
         } finally {
@@ -136,7 +136,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                     topic_code: topicCode,
                     score: finalScore,
                     total_questions: gradeData.total,
-                    raw_data: { questions, answers: finalAnswers, gradedResults: gradeData.results, time_spent: 600 - timeLeft }
+                    raw_data: { questions, answers: finalAnswers, gradedResults: gradeData.results, time_spent: 900 - timeLeft }
                 }]);
 
                 // Log to activity trail
@@ -212,8 +212,8 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
 
                         {questions[currentStep].type === 'text' ? (
                             <div className="space-y-4">
-                                <input
-                                    type="text"
+                                <textarea
+                                    rows={4}
                                     value={answers[currentStep] || ""}
                                     onChange={(e) => {
                                         const newAnswers = [...answers];
@@ -221,16 +221,13 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                                         setAnswers(newAnswers);
                                     }}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && answers[currentStep]) {
-                                            if (currentStep < questions.length - 1) {
-                                                setCurrentStep(currentStep + 1);
-                                            } else {
-                                                submitAudit(answers);
-                                            }
+                                        // Enter adds a newline — does NOT submit
+                                        if (e.key === 'Enter') {
+                                            e.stopPropagation();
                                         }
                                     }}
-                                    placeholder="Type your response here..."
-                                    className="w-full bg-gray-50 border border-[#00B6C1]/10 rounded-xl py-4 px-6 text-sm font-medium outline-none focus:ring-2 focus:ring-[#00B6C1]/20 transition-all"
+                                    placeholder="Type your response here... (press Enter for a new line)"
+                                    className="w-full bg-gray-50 border border-[#00B6C1]/10 rounded-xl py-4 px-6 text-sm font-medium outline-none focus:ring-2 focus:ring-[#00B6C1]/20 transition-all resize-none"
                                     autoFocus
                                 />
                                 <button
@@ -272,48 +269,28 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                         key="result"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="p-8 bg-[#FAFCEE] rounded-[2.5rem] border-2 border-[#00B6C1]/20 text-center shadow-xl"
+                        className="p-10 bg-[#FAFCEE] rounded-[2.5rem] border-2 border-[#00B6C1]/20 text-center shadow-xl"
                     >
-                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg border border-[#00B6C1]/10">
-                            <CheckCircle2 size={32} className="text-[#00B6C1]" />
+                        <div className="w-20 h-20 bg-[#0E5858] rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-[#0E5858]/30 relative">
+                            <div className="absolute inset-0 bg-[#0E5858] rounded-full animate-ping opacity-20"></div>
+                            <CheckCircle2 size={36} className="text-[#00B6C1] relative z-10" />
                         </div>
-                        <h3 className="text-2xl font-serif text-[#0E5858] mb-2">Audit Complete</h3>
-                        <p className="text-[10px] font-black text-[#00B6C1] mb-2 uppercase tracking-[0.2em]">Assessment Logged</p>
+                        <h3 className="text-3xl font-serif text-[#0E5858] mb-3">Quiz Submitted!</h3>
+                        <p className="text-[10px] font-black text-[#00B6C1] mb-6 uppercase tracking-[0.3em]">Assessment Logged to Admin Portal</p>
 
-                        {finalScoreStats && (
-                            <div className="inline-block px-8 py-3 bg-white rounded-2xl border border-[#00B6C1]/10 mb-6">
-                                <p className="text-3xl font-serif text-[#0E5858] mb-1">{Math.round((finalScoreStats.score / finalScoreStats.total) * 100)}%</p>
-                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Efficiency Rating</p>
+                        <div className="p-6 bg-white rounded-2xl border border-[#0E5858]/5 mb-8 text-left flex items-start gap-4 shadow-sm">
+                            <div className="shrink-0 w-10 h-10 bg-[#00B6C1]/10 rounded-xl flex items-center justify-center">
+                                <Sparkles size={18} className="text-[#00B6C1]" />
                             </div>
-                        )}
-
-                        <div className="p-5 bg-white/60 backdrop-blur-sm rounded-2xl text-xs text-gray-500 mb-8 border border-white leading-relaxed">
-                            Your Viva performance and score have been securely transmitted to the <strong>Founders Dashboard</strong>. Re-attempts for low scores require administrative override.
+                            <div>
+                                <p className="text-sm font-bold text-[#0E5858] mb-1">Your responses have been recorded.</p>
+                                <p className="text-xs text-gray-400 leading-relaxed">Your quiz has been securely transmitted to the training team for review. Results will be shared with you by your mentor.</p>
+                            </div>
                         </div>
 
-                        {finalScoreStats && finalScoreStats.results && (
-                            <div className="mt-8 space-y-4 text-left max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-widest mb-2 text-center">Protocol Justifications</p>
-                                {finalScoreStats.results.map((res, i) => (
-                                    <div key={i} className={`p-4 rounded-2xl border ${res.isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                                        <p className="text-[11px] font-bold text-[#0E5858] mb-1">Q{i + 1}: {questions?.[i]?.question}</p>
-                                        <p className="text-[10px] text-gray-600 mb-2">
-                                            <span className="font-bold">Result:</span> {res.isCorrect ? '✅ Correct' : `❌ Incorrect (Correct: ${res.correctAnswer})`}
-                                        </p>
-                                        <div className="bg-white/50 p-3 rounded-xl border border-white">
-                                            <p className="text-[9px] font-medium text-[#0E5858]/70 leading-relaxed italic">
-                                                <span className="font-black uppercase tracking-widest text-[8px] text-[#00B6C1] block mb-1">Scoring Justification:</span>
-                                                {res.justification}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <div className="mt-8 inline-flex items-center gap-3 px-8 py-3 bg-[#0E5858] text-white rounded-[1.2rem] text-xs font-bold shadow-2xl opacity-90 cursor-default">
-                            <Sparkles size={14} className="text-[#00B6C1]" />
-                            Final Audit Submitted
+                        <div className="inline-flex items-center gap-3 px-8 py-3 bg-[#0E5858] text-white rounded-[1.2rem] text-xs font-bold shadow-2xl cursor-default">
+                            <CheckCircle2 size={14} className="text-[#00B6C1]" />
+                            Synced with Admin Dashboard
                         </div>
                     </motion.div>
                 )}
