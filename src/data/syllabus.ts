@@ -66,9 +66,10 @@ export const syllabusData: Module[] = [
                 layout: 'grid',
                 links: [
                     { label: 'BN Website', url: 'https://www.balancenutrition.in/' },
+                    { label: 'Cleanse', url: 'https://bncleanse.com/' },
                     { label: 'BN Recipes', icon: 'target', url: 'https://www.balancenutrition.in/recipes' },
                     { label: 'BN Health Reads', icon: 'globe', url: 'https://www.balancenutrition.in/health-reads' },
-                    { label: 'BN App', icon: 'activity', url: 'https://docs.google.com/document/d/13ueBq-I6O53PrHbPIkifPPZ7tE1HZ9Bl-iTExkhM2Fk/edit?tab=t.0' }
+                    { label: 'BN Health Score', icon: 'activity', url: 'https://www.balancenutrition.in/health-score' }
                 ]
             },
             {
@@ -92,7 +93,7 @@ export const syllabusData: Module[] = [
                     { label: 'LinkedIn Khyati', url: 'https://www.linkedin.com/in/nutritionistkhyatirupani' },
                     { label: 'LinkedIn Vishal', url: 'https://www.linkedin.com/in/vishal-rupani-501a3b4' },
                     { label: 'YouTube', url: 'https://youtube.com/c/BalanceNutrition' },
-                    { label: 'Facebook', url: 'https://www.facebook.com/khyati.rupani.3?mibextid=wwXIfr&rdid=lTKV6HvWFUEJtJwX&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F16re8LMXsv%2F%3Fmibextid%3DwwXIfr#' },
+                    { label: 'Facebook', url: 'https://www.facebook.com/khyati.rupani.3?mibextid=wwXIfr&rdid=lTKV6HvWFUEJtJwX&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F16re8LMXsv%2F%3Fmibextid%3DwwXIfr#' }
                 ]
             },
 
