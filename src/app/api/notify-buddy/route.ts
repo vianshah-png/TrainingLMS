@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { resend, SENDER_EMAIL } from '@/lib/mail';
+import { mailer, SENDER_EMAIL } from '@/lib/mail';
 
 export async function POST(req: Request) {
   try {
@@ -119,17 +119,12 @@ export async function POST(req: Request) {
         console.log(`-> Reply-To: ${payload.replyTo}`);
         console.log(`-> CC: ${payload.cc.join(', ')}`);
         console.log(`-> Subject: ${payload.subject}`);
-        console.log(`-> Sending auto-report via Resend SDK...`);
+        console.log(`-> Sending auto-report via NodeMailer...`);
 
-        const data = await resend.emails.send(payload);
+        const info = await mailer.sendMail(payload);
 
-        console.log(`-> Auto-Report Resend API Response:`, JSON.stringify(data, null, 2));
-
-        if (data.error) {
-          console.error(`-> Resend API Error returned for Buddy:`, data.error);
-        } else {
-          console.log(`-> Auto-Report successfully sent to Buddy! ID: ${data.data?.id}\n`);
-        }
+        console.log(`-> Auto-Report NodeMailer Response:`, typeof info === 'object' ? JSON.stringify(info, null, 2) : info);
+        console.log(`-> Auto-Report successfully sent to Buddy! Message ID: ${info?.messageId}\n`);
 
       } catch (e) {
         console.error(`Failed to send email to ${buddy.email}:`, e);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import {
     Users,
@@ -49,7 +49,10 @@ import {
     Bell,
     Edit3,
     Activity,
-    X
+    X,
+    Play,
+    ScanEye,
+    Share2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -102,6 +105,13 @@ const TOTAL_SYLLABUS_TOPICS = syllabusData
     .filter(m => m.id !== 'resource-bank')
     .reduce((acc, mod) => acc + mod.topics.length, 0);
 
+const NOTIFICATION_TEMPLATES = [
+    { id: 'inactive', label: 'Inactive', title: 'Account Status: Inactive', message: 'Your account has been flagged as inactive due to low engagement. Please resume your clinical training modules to remain eligible for upcoming certifications.', type: 'info' },
+    { id: 'feedback', label: 'Feedback Request', title: 'Clinical Training Feedback', message: 'We value your experience! Please provide a star rating and a brief note about the clarity and utility of your recent modules.', type: 'alert', template: 'feedback' },
+    { id: 'retake', label: 'Retake Test', title: 'Performance Review: Retake Required', message: 'Your recent assessment score was below the mastery threshold. Please revisit the clinical module and retake the test once you are ready.', type: 'alert' },
+    { id: 'buddy_report', label: 'Trainer Buddy Summary Email', title: 'Weekly Mentorship Report', message: 'This report contains an automated summary of all your assigned counsellors, including their current activity, training progress, and latest quiz scores.', type: 'info', template: 'buddy_report' },
+];
+
 interface DynamicContent {
     id: string;
     module_id: string;
@@ -151,12 +161,14 @@ function AdminDashboardContent() {
     const [creatingUser, setCreatingUser] = useState(false);
     const [userSuccess, setUserSuccess] = useState("");
     const [userError, setUserError] = useState("");
+    const [lastCreatedUser, setLastCreatedUser] = useState<any>(null);
     const [deleteConfirm, setDeleteConfirm] = useState("");
     const [isDeleting, setIsDeleting] = useState(false);
     const [resettingUser, setResettingUser] = useState(false);
     const [adminPhone, setAdminPhone] = useState("");
     const [updatingAdmin, setUpdatingAdmin] = useState(false);
     const [currentAdmin, setCurrentAdmin] = useState<Profile | null>(null);
+    const hasSyncedRegistry = useRef(false);
 
     const [contentForm, setContentForm] = useState({
         id: "",
@@ -184,6 +196,10 @@ function AdminDashboardContent() {
     const [tempPhone, setTempPhone] = useState("");
     const [updatingPhone, setUpdatingPhone] = useState(false);
 
+    const [editingRole, setEditingRole] = useState(false);
+    const [tempRole, setTempRole] = useState("");
+    const [updatingRole, setUpdatingRole] = useState(false);
+
     // Quiz Editor States
     const [selectedQuizTopic, setSelectedQuizTopic] = useState("");
     const [manualQuizQuestions, setManualQuizQuestions] = useState<any[]>([]);
@@ -198,7 +214,9 @@ function AdminDashboardContent() {
     const [notificationForm, setNotificationForm] = useState({
         title: "",
         message: "",
-        type: "info" as "info" | "warning" | "alert"
+        type: "info" as "info" | "warning" | "alert",
+        template: "none" as "none" | "ack" | "feedback" | "rating",
+        interactionPayload: {} as any
     });
     const [sendingNotification, setSendingNotification] = useState(false);
     const [notificationSuccess, setNotificationSuccess] = useState("");
@@ -219,18 +237,20 @@ function AdminDashboardContent() {
     const [emailError, setEmailError] = useState("");
 
 
+    const isTrainerBuddyRole = userRole === 'trainer buddy';
+
     useEffect(() => {
         const tab = searchParams.get('tab');
         if (tab && ['hub', 'provisioning', 'architect', 'registry'].includes(tab)) {
-            // Restriction for trainer buddies
-            if (userRole === 'trainer buddy' && ['provisioning', 'architect'].includes(tab)) {
-                setActiveTab('hub');
-                router.replace('/admin?tab=hub');
+            // Restriction for trainer buddies — only hub and registry allowed
+            if (isTrainerBuddyRole && ['provisioning', 'architect'].includes(tab)) {
+                setActiveTab('registry');
+                router.replace('/admin?tab=registry');
             } else {
                 setActiveTab(tab as any);
             }
         }
-    }, [searchParams, userRole, router]);
+    }, [searchParams, userRole, router, isTrainerBuddyRole]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -247,10 +267,19 @@ function AdminDashboardContent() {
                 .select('*')
                 .eq('id', session.user.id)
                 .single();
+            console.log("[Admin Auth] Current user profile:", aProfile?.email, "| Role:", aProfile?.role);
             if (aProfile) {
                 setCurrentAdmin(aProfile);
                 setAdminPhone(aProfile.phone || "");
-                setUserRole(aProfile.role || "");
+                const currentRole = aProfile.role || "";
+                setUserRole(currentRole);
+
+                // Restricted: Standard counsellors cannot access Admin Portal
+                if (currentRole === 'counsellor' || currentRole === 'mentor') {
+                    console.log("[Admin Auth] Redirecting counsellor/mentor to dashboard");
+                    router.push('/');
+                    return;
+                }
             }
 
             // Fetch received notifications for the logged in admin/buddy
@@ -301,6 +330,25 @@ function AdminDashboardContent() {
             const isTrainerBuddy = userProfile?.role === 'trainer buddy';
             const userEmail = userProfile?.email;
 
+            // Optional: Pull in latest metadata from Auth for orphaned profiles or missing fields
+            if (!hasSyncedRegistry.current && !isTrainerBuddy) {
+                try {
+                    const syncRes = await fetch('/api/admin/sync-registry', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        }
+                    });
+                    if (syncRes.ok) {
+                        hasSyncedRegistry.current = true;
+                        console.log("Master Registry Synchronized successfully.");
+                    }
+                } catch (e) {
+                    console.warn("Auto-Sync skipped:", e);
+                }
+            }
+
             const [
                 { data: pData, error: pError },
                 { data: aData, error: aError },
@@ -322,16 +370,20 @@ function AdminDashboardContent() {
 
             let filteredProfiles = pData || [];
             if (isTrainerBuddy && userEmail) {
+                console.log("[Buddy Filter] Trainer buddy email:", userEmail, "| Total profiles:", pData?.length);
                 filteredProfiles = (pData || []).filter(p => {
                     try {
                         const buddies = JSON.parse(p.training_buddy || '[]');
                         const buddiesArray = Array.isArray(buddies) ? buddies : [buddies];
-                        return buddiesArray.some((b: any) => b.email?.toLowerCase() === userEmail.toLowerCase());
+                        const match = buddiesArray.some((b: any) => b.email?.toLowerCase() === userEmail.toLowerCase());
+                        if (match) console.log("[Buddy Filter] MATCHED:", p.email, p.full_name);
+                        return match;
                     } catch (e) {
                         // Fallback for comma separated legacy data
                         return p.training_buddy?.toLowerCase().includes(userEmail.toLowerCase());
                     }
                 });
+                console.log("[Buddy Filter] Filtered counsellors count:", filteredProfiles.length);
             }
 
             const allowedUserIds = new Set(filteredProfiles.map(p => p.id));
@@ -418,10 +470,13 @@ function AdminDashboardContent() {
         setCreatingUser(true);
         setUserError("");
         setUserSuccess("");
+        setLastCreatedUser(null);
 
         try {
+            // Force a session refresh check before potentially long operations
+            await supabase.auth.getUser();
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session) throw new Error('Session expired. Please log in again.');
+            if (sessionError || !session) throw new Error('Session Expired. Please refresh the page or log in again.');
 
             // Validation for buddies
             const incompleteBuddy = newUser.buddies.find(b => !b.name || !b.email || !b.phone);
@@ -451,6 +506,7 @@ function AdminDashboardContent() {
             if (!response.ok) throw new Error(data.error || 'Provisioning failed');
 
             setUserSuccess(`Authorized: ${newUser.email}. Account created.`);
+            setLastCreatedUser({ ...newUser });
             setNewUser({
                 email: "", password: "", fullName: "", role: "counsellor", phone: "",
                 buddies: [{ name: "BN Admin", email: "admin@balancenutrition.in", phone: "0000000000" }]
@@ -578,6 +634,27 @@ function AdminDashboardContent() {
             alert("Failed to update phone: " + err.message);
         } finally {
             setUpdatingPhone(false);
+        }
+    };
+
+    const handleUpdateUserRole = async () => {
+        if (!selectedProfile) return;
+        setUpdatingRole(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ role: tempRole })
+                .eq('id', selectedProfile.id);
+            if (error) throw error;
+
+            setSelectedProfile({ ...selectedProfile, role: tempRole });
+            setEditingRole(false);
+            refreshData();
+            alert(`Role updated to ${tempRole} successfully.`);
+        } catch (err: any) {
+            alert("Failed to update role: " + err.message);
+        } finally {
+            setUpdatingRole(false);
         }
     };
 
@@ -809,7 +886,7 @@ function AdminDashboardContent() {
 
             setNotificationSuccess(`Sent via: ${sent.join(', ') || channel}`);
             if (channel !== 'whatsapp') {
-                setNotificationForm({ title: "", message: "", type: "info" });
+                setNotificationForm({ title: "", message: "", type: "info", template: "none", interactionPayload: {} });
             }
             setTimeout(() => setNotificationSuccess(""), 4000);
         } catch (err: any) {
@@ -836,37 +913,15 @@ function AdminDashboardContent() {
         }
     };
 
-    const NOTIFICATION_TEMPLATES = [
-        {
-            id: 'feedback',
-            label: 'LMS Feedback',
-            title: 'Share Your LMS Experience',
-            message: 'Hello! We hope your training is going well. Please share your feedback on the LMS platform to help us improve your learning experience.',
-            type: 'info'
-        },
-        {
-            id: 'inactivity',
-            label: 'Inactivity Detected',
-            title: 'Action Required: Inactivity Detected',
-            message: 'We noticed you haven\'t logged in for a few days. Consistency is key to mastering the BN protocols! Please resume your training modules today.',
-            type: 'warning'
-        },
-        {
-            id: 'training-time',
-            label: 'Training Time Remaining',
-            title: 'Final Stretch: Training Completion',
-            message: 'You have only a few days left to complete your assigned training modules. Please ensure all quizzes and assignments are submitted on time.',
-            type: 'alert'
-        }
-    ];
-
     const handleApplyTemplate = (tempId: string) => {
         const template = NOTIFICATION_TEMPLATES.find(t => t.id === tempId);
         if (template) {
             setNotificationForm({
                 title: template.title,
                 message: template.message,
-                type: template.type as any
+                type: template.type as any,
+                template: template.id as any,
+                interactionPayload: {}
             });
         }
     };
@@ -1061,7 +1116,7 @@ function AdminDashboardContent() {
                         onClick={() => { setActiveTab('registry'); router.push('?tab=registry'); }}
                         className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'registry' ? 'bg-[#0E5858] text-white shadow-lg shadow-[#0E5858]/20' : 'text-gray-400 hover:text-[#0E5858] hover:bg-white'}`}
                     >
-                        <Users size={14} /> Master Registry
+                        <Users size={14} /> {isTrainerBuddyRole ? 'My Counsellors' : 'Master Registry'}
                     </button>
                 </div>
             )}
@@ -1160,7 +1215,20 @@ function AdminDashboardContent() {
                                         <div className="bg-[#FAFCEE] p-4 rounded-2xl border border-[#0E5858]/5 text-center mb-4">
                                             {(() => {
                                                 const validTopicCodes = new Set(syllabusData.filter(m => m.id !== 'resource-bank').flatMap(m => m.topics.map(t => t.code)));
-                                                const userProgressCount = progress.filter(pr => pr.user_id === selectedProfile.id && validTopicCodes.has(pr.topic_code)).length;
+
+                                                // Virtual Progress Collection: Explicit + Implicit (via assessments)
+                                                const userProgressTopics = new Set(progress.filter(pr => pr.user_id === selectedProfile.id).map(pr => pr.topic_code));
+                                                const userAssessments = assessments.filter(a => a.user_id === selectedProfile.id);
+                                                const passedModuleIds = new Set(userAssessments.filter(a => a.topic_code.startsWith('MODULE_')).map(a => a.topic_code.replace('MODULE_', '').toLowerCase()));
+
+                                                // Backfill topics for passed modules
+                                                syllabusData.forEach(m => {
+                                                    if (passedModuleIds.has(m.id.toLowerCase())) {
+                                                        m.topics.forEach(t => userProgressTopics.add(t.code));
+                                                    }
+                                                });
+
+                                                const userProgressCount = Array.from(userProgressTopics).filter(code => validTopicCodes.has(code)).length;
                                                 const userActivity = activity.filter(a => a.user_id === selectedProfile.id);
                                                 const globalPercent = Math.min(100, Math.round((userProgressCount / (TOTAL_SYLLABUS_TOPICS || 1)) * 100));
                                                 const lastAct = userActivity[0];
@@ -1188,44 +1256,46 @@ function AdminDashboardContent() {
                                         <div className="flex flex-col text-xs py-1 border-b border-gray-50 pb-4 mb-2">
                                             <div className="flex justify-between items-center w-full">
                                                 <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Assigned Buddies</span>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            let currentBuddies = [];
-                                                            try {
-                                                                const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
-                                                                currentBuddies = Array.isArray(parsed) ? parsed : [parsed];
-                                                            } catch (e) {
-                                                                if (selectedProfile.training_buddy) {
-                                                                    currentBuddies = [{ name: "BN Admin", email: selectedProfile.training_buddy, phone: "0000000000" }];
+                                                {!isTrainerBuddyRole && (
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                let currentBuddies = [];
+                                                                try {
+                                                                    const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
+                                                                    currentBuddies = Array.isArray(parsed) ? parsed : [parsed];
+                                                                } catch (e) {
+                                                                    if (selectedProfile.training_buddy) {
+                                                                        currentBuddies = [{ name: "BN Admin", email: selectedProfile.training_buddy, phone: "0000000000" }];
+                                                                    }
                                                                 }
-                                                            }
-                                                            setBuddyList([...currentBuddies, { name: "", email: "", phone: "" }]);
-                                                            setEditingBuddy(true);
-                                                        }}
-                                                        title="Add New Buddy"
-                                                        className="text-gray-300 hover:text-[#00B6C1] transition-colors"
-                                                    >
-                                                        <Plus size={10} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            try {
-                                                                const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
-                                                                setBuddyList(Array.isArray(parsed) ? parsed : [parsed]);
-                                                            } catch (e) {
-                                                                setBuddyList([{ name: "BN Admin", email: selectedProfile.training_buddy || "admin@balancenutrition.in", phone: "0000000000" }]);
-                                                            }
-                                                            setEditingBuddy(true);
-                                                        }}
-                                                        title="Edit Existing"
-                                                        className="text-gray-300 hover:text-[#00B6C1] transition-colors"
-                                                    >
-                                                        <Pencil size={10} />
-                                                    </button>
-                                                </div>
+                                                                setBuddyList([...currentBuddies, { name: "", email: "", phone: "" }]);
+                                                                setEditingBuddy(true);
+                                                            }}
+                                                            title="Add New Buddy"
+                                                            className="text-gray-300 hover:text-[#00B6C1] transition-colors"
+                                                        >
+                                                            <Plus size={10} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                try {
+                                                                    const parsed = JSON.parse(selectedProfile.training_buddy || '[]');
+                                                                    setBuddyList(Array.isArray(parsed) ? parsed : [parsed]);
+                                                                } catch (e) {
+                                                                    setBuddyList([{ name: "BN Admin", email: selectedProfile.training_buddy || "admin@balancenutrition.in", phone: "0000000000" }]);
+                                                                }
+                                                                setEditingBuddy(true);
+                                                            }}
+                                                            title="Edit Existing"
+                                                            className="text-gray-300 hover:text-[#00B6C1] transition-colors"
+                                                        >
+                                                            <Pencil size={10} />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {editingBuddy ? (
+                                            {editingBuddy && !isTrainerBuddyRole ? (
                                                 <div className="flex flex-col gap-3 w-full mt-3">
                                                     <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                                                         {buddyList.map((buddy, idx) => (
@@ -1333,137 +1403,242 @@ function AdminDashboardContent() {
                                             <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Joined On</span>
                                             <span className="text-[#0E5858] font-bold">{new Date(selectedProfile.created_at || '').toLocaleDateString()}</span>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Access Level</span>
-                                            <span className="badge-teal text-[8px] uppercase">{selectedProfile.role}</span>
+
+                                        <div className="pt-4 mt-2">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const { data: { session } } = await supabase.auth.getSession();
+                                                        if (!session) return;
+
+                                                        // Apply the template first so the handler knows what to send
+                                                        handleApplyTemplate('buddy_report');
+
+                                                        // Small delay to ensure state updates (or just pass the parameters directly)
+                                                        // For simplicity and reliability in one-shot, we'll call the API with the specific template logic
+                                                        const res = await fetch('/api/admin/notifications', {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'Authorization': `Bearer ${session.access_token}`
+                                                            },
+                                                            body: JSON.stringify({
+                                                                userId: selectedProfile.id,
+                                                                title: `Activity Report: ${selectedProfile.full_name}`,
+                                                                message: `Here is the requested activity and performance report for ${selectedProfile.full_name}.`,
+                                                                type: 'info',
+                                                                channel: 'email',
+                                                                template: 'direct_report'
+                                                            })
+                                                        });
+
+                                                        if (res.ok) {
+                                                            setNotificationSuccess("Full report shared with Buddy!");
+                                                            setTimeout(() => setNotificationSuccess(""), 3000);
+                                                        } else {
+                                                            throw new Error("Failed to share report");
+                                                        }
+                                                    } catch (e: any) {
+                                                        alert(e.message);
+                                                    }
+                                                }}
+                                                className="w-full py-4 bg-[#B8E218] text-[#0E5858] rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-[#B8E218]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border-b-4 border-[#9CBF14]"
+                                            >
+                                                <Share2 size={16} /> Share Activity Report
+                                            </button>
+                                            <p className="text-[7px] text-gray-400 font-bold uppercase tracking-widest mt-3 text-center">Sends full performance trail to Buddy</p>
                                         </div>
 
-                                        <div className="pt-10 border-t border-red-50 mt-10 space-y-4">
-                                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest text-center">Danger Zone</p>
-                                            <div className="bg-red-50/50 p-6 rounded-[2rem] border border-red-100 space-y-4">
-                                                <p className="text-[9px] text-red-500 font-medium leading-relaxed text-center">To delete this account permanently, type "delete account" below.</p>
-                                                <input
-                                                    type="text"
-                                                    value={deleteConfirm}
-                                                    onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
-                                                    placeholder="type 'delete account'"
-                                                    className="w-full bg-white border border-red-100 rounded-xl py-3 px-4 text-xs text-red-600 font-bold outline-none focus:ring-2 focus:ring-red-200 text-center"
-                                                />
-                                                <button
-                                                    onClick={handleDeleteAccount}
-                                                    disabled={isDeleting || deleteConfirm !== 'delete account'}
-                                                    className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${deleteConfirm === 'delete account' ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-                                                >
-                                                    {isDeleting ? <Loader2 className="animate-spin" size={14} /> : <><Trash2 size={14} /> Permanent Deletion</>}
-                                                </button>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Access Level</span>
+                                            <div className="flex items-center gap-2">
+                                                {editingRole && !isTrainerBuddyRole ? (
+                                                    <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                                                        <select
+                                                            value={tempRole}
+                                                            onChange={e => setTempRole(e.target.value)}
+                                                            className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5 text-[10px] font-bold outline-none text-[#0E5858]"
+                                                        >
+                                                            <option value="counsellor">Counsellor</option>
+                                                            <option value="trainer buddy">Trainer Buddy</option>
+                                                            <option value="product automation">Product Automation</option>
+                                                            <option value="tech dev">Tech Dev</option>
+                                                            <option value="business devp">Business Devp</option>
+                                                            <option value="admin">Admin</option>
+                                                        </select>
+                                                        <button
+                                                            onClick={handleUpdateUserRole}
+                                                            disabled={updatingRole}
+                                                            className="w-8 h-8 rounded-lg bg-[#00B6C1] text-white flex items-center justify-center hover:bg-[#0E5858] transition-all disabled:opacity-50 shadow-sm"
+                                                        >
+                                                            {updatingRole ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={14} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingRole(false)}
+                                                            className="w-8 h-8 rounded-lg bg-white border border-gray-100 text-gray-400 flex items-center justify-center hover:text-red-500 transition-all shadow-sm"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="badge-teal text-[8px] uppercase">{selectedProfile.role}</span>
+                                                        {!isTrainerBuddyRole && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setTempRole(selectedProfile.role);
+                                                                    setEditingRole(true);
+                                                                }}
+                                                                className="text-gray-300 hover:text-[#00B6C1] transition-colors"
+                                                                title="Change Role"
+                                                            >
+                                                                <Pencil size={10} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="pt-6 mt-6 border-t border-red-50">
-                                            <button
-                                                onClick={() => handleResetUser(selectedProfile.id)}
-                                                disabled={resettingUser}
-                                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-100 text-red-500 text-[9px] font-black uppercase tracking-widest hover:bg-red-50 transition-all"
-                                            >
-                                                {resettingUser ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Clear Activity History</>}
-                                            </button>
-                                            <p className="text-[7px] text-gray-300 font-medium mt-3 text-center uppercase tracking-widest">Resets logs, progress, and scores</p>
-                                        </div>
+
+                                        {/* Admin-only: Danger Zone — hidden from Trainer Buddies */}
+                                        {!isTrainerBuddyRole && (
+                                            <>
+                                                <div className="pt-10 border-t border-red-50 mt-10 space-y-4">
+                                                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest text-center">Danger Zone</p>
+                                                    <div className="bg-red-50/50 p-6 rounded-[2rem] border border-red-100 space-y-4">
+                                                        <p className="text-[9px] text-red-500 font-medium leading-relaxed text-center">To delete this account permanently, type "delete account" below.</p>
+                                                        <input
+                                                            type="text"
+                                                            value={deleteConfirm}
+                                                            onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
+                                                            placeholder="type 'delete account'"
+                                                            className="w-full bg-white border border-red-100 rounded-xl py-3 px-4 text-xs text-red-600 font-bold outline-none focus:ring-2 focus:ring-red-200 text-center"
+                                                        />
+                                                        <button
+                                                            onClick={handleDeleteAccount}
+                                                            disabled={isDeleting || deleteConfirm !== 'delete account'}
+                                                            className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${deleteConfirm === 'delete account' ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                                        >
+                                                            {isDeleting ? <Loader2 className="animate-spin" size={14} /> : <><Trash2 size={14} /> Permanent Deletion</>}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-6 mt-6 border-t border-red-50">
+                                                    <button
+                                                        onClick={() => handleResetUser(selectedProfile.id)}
+                                                        disabled={resettingUser}
+                                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-100 text-red-500 text-[9px] font-black uppercase tracking-widest hover:bg-red-50 transition-all"
+                                                    >
+                                                        {resettingUser ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Clear Activity History</>}
+                                                    </button>
+                                                    <p className="text-[7px] text-gray-300 font-medium mt-3 text-center uppercase tracking-widest">Resets logs, progress, and scores</p>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
 
 
-                                <div className="bg-[#0E5858] text-white rounded-[3rem] p-10 shadow-xl space-y-8">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="text-sm font-black uppercase tracking-[0.2em] text-[#00B6C1]">Dispatch Notification</h4>
-                                        <Bell size={20} className="text-[#00B6C1]" />
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-2">
-                                        {NOTIFICATION_TEMPLATES.map(temp => (
-                                            <button
-                                                key={temp.id}
-                                                onClick={() => handleApplyTemplate(temp.id)}
-                                                className="px-3 py-1.5 bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-white hover:bg-[#00B6C1] transition-all shadow-sm"
-                                            >
-                                                {temp.label}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Notification Title</label>
-                                            <input
-                                                type="text"
-                                                value={notificationForm.title}
-                                                onChange={e => setNotificationForm({ ...notificationForm, title: e.target.value })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:ring-2 focus:ring-[#00B6C1]/30 transition-all text-white"
-                                                placeholder="Enter title..."
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Message Body</label>
-                                            <textarea
-                                                value={notificationForm.message}
-                                                onChange={e => setNotificationForm({ ...notificationForm, message: e.target.value })}
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium outline-none focus:ring-2 focus:ring-[#00B6C1]/30 transition-all text-white h-32 resize-none"
-                                                placeholder="Type your message here..."
-                                            />
+                                {/* Notification dispatch - admin only */}
+                                {!isTrainerBuddyRole && (
+                                    <div className="bg-[#0E5858] text-white rounded-[3rem] p-10 shadow-xl space-y-8">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="text-sm font-black uppercase tracking-[0.2em] text-[#00B6C1]">Dispatch Notification</h4>
+                                            <Bell size={20} className="text-[#00B6C1]" />
                                         </div>
 
-                                        <div className="flex items-center gap-4">
-                                            {(['info', 'warning', 'alert'] as const).map(t => (
+                                        <div className="flex flex-wrap gap-2">
+                                            {NOTIFICATION_TEMPLATES.map(temp => (
                                                 <button
-                                                    key={t}
-                                                    type="button"
-                                                    onClick={() => setNotificationForm({ ...notificationForm, type: t })}
-                                                    className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg border transition-all ${notificationForm.type === t
-                                                        ? t === 'alert' ? 'bg-red-500 text-white border-red-500 shadow-md' : t === 'warning' ? 'bg-orange-400 text-white border-orange-400 shadow-md' : 'bg-[#00B6C1] text-white border-[#00B6C1] shadow-md'
-                                                        : 'bg-white/5 text-white/40 border-white/10'
-                                                        }`}
+                                                    key={temp.id}
+                                                    onClick={() => handleApplyTemplate(temp.id)}
+                                                    className={`px-3 py-1.5 border rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm ${notificationForm.template === temp.id ? 'bg-[#00B6C1] text-[#0E5858] border-[#00B6C1]' : 'bg-white/10 border-white/10 text-white hover:bg-white/20'}`}
                                                 >
-                                                    {t}
+                                                    {temp.label}
                                                 </button>
                                             ))}
                                         </div>
 
-                                        {notificationSuccess && (
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-green-400 text-center animate-pulse">{notificationSuccess}</p>
-                                        )}
+                                        <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                            <span className="text-[7px] font-black uppercase text-white/40">Active Protocol:</span>
+                                            <span className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-[0.2em]">{notificationForm.template}</span>
+                                        </div>
 
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => handleSendNotification(selectedProfile.id, 'dashboard')}
-                                                disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
-                                                className="py-3.5 bg-[#00B6C1] text-[#0E5858] rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00B6C1]/20 disabled:opacity-40"
-                                            >
-                                                {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Bell size={14} /> Dashboard</>}
-                                            </button>
-                                            <button
-                                                onClick={() => handleSendNotification(selectedProfile.id, 'email')}
-                                                disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
-                                                className="py-3.5 bg-blue-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-40"
-                                            >
-                                                {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Mail size={14} /> Email</>}
-                                            </button>
-                                            <button
-                                                onClick={() => handleSendNotification(selectedProfile.id, 'whatsapp')}
-                                                disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
-                                                className="py-3.5 bg-green-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-40"
-                                            >
-                                                {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Phone size={14} /> WhatsApp</>}
-                                            </button>
-                                            <button
-                                                onClick={() => handleSendNotification(selectedProfile.id, 'all')}
-                                                disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
-                                                className="py-3.5 bg-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-40"
-                                            >
-                                                {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Sparkles size={14} /> Send All</>}
-                                            </button>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Notification Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={notificationForm.title}
+                                                    onChange={e => setNotificationForm({ ...notificationForm, title: e.target.value })}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:ring-2 focus:ring-[#00B6C1]/30 transition-all text-white"
+                                                    placeholder="Enter title..."
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Message Body</label>
+                                                <textarea
+                                                    value={notificationForm.message}
+                                                    onChange={e => setNotificationForm({ ...notificationForm, message: e.target.value })}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs font-medium outline-none focus:ring-2 focus:ring-[#00B6C1]/30 transition-all text-white h-32 resize-none"
+                                                    placeholder="Type your message here..."
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center gap-4">
+                                                {(['info', 'warning', 'alert'] as const).map(t => (
+                                                    <button
+                                                        key={t}
+                                                        type="button"
+                                                        onClick={() => setNotificationForm({ ...notificationForm, type: t })}
+                                                        className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg border transition-all ${notificationForm.type === t
+                                                            ? t === 'alert' ? 'bg-red-500 text-white border-red-500 shadow-md' : t === 'warning' ? 'bg-orange-400 text-white border-orange-400 shadow-md' : 'bg-[#00B6C1] text-white border-[#00B6C1] shadow-md'
+                                                            : 'bg-white/5 text-white/40 border-white/10'
+                                                            }`}
+                                                    >
+                                                        {t}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {notificationSuccess && (
+                                                <p className="text-[8px] font-black uppercase tracking-widest text-green-400 text-center animate-pulse">{notificationSuccess}</p>
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => handleSendNotification(selectedProfile.id, 'dashboard')}
+                                                    disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                                                    className="py-3.5 bg-[#00B6C1] text-[#0E5858] rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00B6C1]/20 disabled:opacity-40"
+                                                >
+                                                    {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Bell size={14} /> Dashboard</>}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSendNotification(selectedProfile.id, 'email')}
+                                                    disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                                                    className="py-3.5 bg-blue-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-40"
+                                                >
+                                                    {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Mail size={14} /> Email</>}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSendNotification(selectedProfile.id, 'whatsapp')}
+                                                    disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                                                    className="py-3.5 bg-green-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-40"
+                                                >
+                                                    {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Phone size={14} /> WhatsApp</>}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSendNotification(selectedProfile.id, 'all')}
+                                                    disabled={sendingNotification || !notificationForm.title || !notificationForm.message}
+                                                    className="py-3.5 bg-white/10 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-40"
+                                                >
+                                                    {sendingNotification ? <Loader2 size={14} className="animate-spin" /> : <><Sparkles size={14} /> Send All</>}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Main Detail Area */}
@@ -1475,54 +1650,47 @@ function AdminDashboardContent() {
                                             <Monitor size={16} className="text-[#00B6C1]" /> Recent Activity Trail
                                         </h4>
                                         <div className="space-y-6 relative pl-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {activity.filter(a => a.user_id === selectedProfile.id).length > 0 ? (
-                                                activity.filter(a => a.user_id === selectedProfile.id).slice(0, 20).map((log, i) => {
-                                                    const isLast = i === activity.filter(a => a.user_id === selectedProfile.id).length - 1;
+                                            {(() => {
+                                                const userAssessments = assessments.filter(a => a.user_id === selectedProfile.id);
+                                                const passedModuleIds = new Set(userAssessments.filter(a => a.topic_code.startsWith('MODULE_')).map(a => a.topic_code.replace('MODULE_', '').toLowerCase()));
+                                                const userActivity = activity.filter(a => a.user_id === selectedProfile.id);
 
-                                                    // Map icons to activity types
+                                                if (userActivity.length === 0) return (
+                                                    <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                                                        <Activity size={40} className="mb-4" />
+                                                        <p className="text-[10px] font-black uppercase tracking-widest">No activity recorded yet</p>
+                                                    </div>
+                                                );
+
+                                                return userActivity.slice(0, 50).map((log, i) => {
+                                                    const isLast = i === userActivity.length - 1;
                                                     const getIcon = (type: string) => {
                                                         if (type.includes('module')) return <Award size={14} className="text-yellow-500" />;
                                                         if (type.includes('quiz')) return <Brain size={14} className="text-purple-500" />;
                                                         if (type.includes('assignment')) return <ClipboardList size={14} className="text-blue-500" />;
                                                         if (type.includes('segment')) return <CheckCircle2 size={14} className="text-green-500" />;
+                                                        if (type.includes('watch_video')) return <Play size={14} className="text-[#00B6C1]" />;
+                                                        if (type.includes('click_link')) return <ExternalLink size={14} className="text-[#0E5858]" />;
                                                         return <Clock size={14} className="text-gray-400" />;
                                                     };
 
                                                     return (
                                                         <div key={log.id} className="relative pb-6 group">
-                                                            {!isLast && (
-                                                                <div className="absolute left-[-13px] top-4 bottom-0 w-[1px] bg-gray-100 group-hover:bg-[#00B6C1]/20 transition-colors" />
-                                                            )}
-                                                            <div className="absolute left-[-18.5px] top-1 w-6 h-6 rounded-lg bg-white border border-gray-100 flex items-center justify-center shadow-sm group-hover:border-[#00B6C1]/30 transition-all z-10">
+                                                            {!isLast && <div className="absolute left-[-13px] top-4 bottom-0 w-[1px] bg-gray-100 group-hover:bg-[#00B6C1]/20 transition-colors" />}
+                                                            <div className="absolute left-[-18.5px] top-1 w-6 h-6 rounded-lg bg-white border border-gray-100 flex items-center justify-center shadow-sm z-10">
                                                                 {getIcon(log.activity_type)}
                                                             </div>
                                                             <div className="pl-4">
-                                                                <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                                                                    <p className="text-[10px] font-black text-[#0E5858] uppercase tracking-wider">
-                                                                        {log.activity_type.replace('_', ' ')}
-                                                                    </p>
-                                                                </div>
-                                                                <p className="text-[11px] font-medium text-gray-500 leading-tight">
-                                                                    {log.content_title || log.topic_code || 'System Event'}
-                                                                </p>
+                                                                <p className="text-[10px] font-black text-[#0E5858] uppercase tracking-wider">{log.activity_type.replace('_', ' ')}</p>
+                                                                <p className="text-[11px] font-medium text-gray-500 leading-tight">{log.content_title || log.topic_code || 'System Event'}</p>
                                                                 <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-                                                                    {new Date(log.created_at).toLocaleString([], {
-                                                                        month: 'short',
-                                                                        day: 'numeric',
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit'
-                                                                    })}
+                                                                    {new Date(log.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                                 </p>
                                                             </div>
                                                         </div>
                                                     );
-                                                })
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                                                    <Activity size={40} className="mb-4" />
-                                                    <p className="text-[10px] font-black uppercase tracking-widest">No activity recorded yet</p>
-                                                </div>
-                                            )}
+                                                });
+                                            })()}
                                         </div>
                                     </div>
 
@@ -1596,46 +1764,55 @@ function AdminDashboardContent() {
                                     </h4>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        {syllabusData.filter(m => m.id !== 'resource-bank').map(module => {
-                                            const dynamicForModule = dynamicContent.filter(d => d.module_id === module.id);
-                                            const moduleProgress = progress.filter(p => p.user_id === selectedProfile.id && p.module_id === module.id);
-                                            const totalTopics = module.topics.length + dynamicForModule.length;
-                                            const percent = totalTopics > 0 ? (moduleProgress.length / totalTopics) * 100 : 0;
+                                        {(() => {
+                                            const userAssessments = assessments.filter(a => a.user_id === selectedProfile.id);
+                                            const passedModuleIds = new Set(userAssessments.filter(a => a.topic_code.startsWith('MODULE_')).map(a => a.topic_code.replace('MODULE_', '').toLowerCase()));
 
-                                            // Create an array that includes both static topics and dynamic placeholders/identifiers
-                                            const allTopics = [...module.topics, ...dynamicForModule.map(d => ({ code: `DYN-${d.id}`, title: d.title }))];
+                                            return syllabusData.filter(m => m.id !== 'resource-bank').map(module => {
+                                                const dynamicForModule = dynamicContent.filter(d => d.module_id === module.id);
+                                                const rawModuleProgress = progress.filter(p => p.user_id === selectedProfile.id && p.module_id === module.id);
 
-                                            return (
-                                                <div key={module.id} className="space-y-4">
-                                                    <div className="flex justify-between items-end">
-                                                        <div>
-                                                            <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest mb-1">{module.type}</p>
-                                                            <h5 className="text-sm font-serif font-bold text-[#0E5858] truncate max-w-[200px]">{module.title}</h5>
+                                                const isModulePassed = passedModuleIds.has(module.id.toLowerCase());
+                                                const totalTopics = module.topics.length + dynamicForModule.length;
+
+                                                const explicitTopicsCount = rawModuleProgress.length;
+                                                const percent = isModulePassed ? 100 : (totalTopics > 0 ? (explicitTopicsCount / totalTopics) * 100 : 0);
+
+                                                // Create an array that includes both static topics and dynamic placeholders/identifiers
+                                                const allTopics = [...module.topics, ...dynamicForModule.map(d => ({ code: `DYN-${d.id}`, title: d.title }))];
+
+                                                return (
+                                                    <div key={module.id} className="space-y-4">
+                                                        <div className="flex justify-between items-end">
+                                                            <div>
+                                                                <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest mb-1">{module.type}</p>
+                                                                <h5 className="text-sm font-serif font-bold text-[#0E5858] truncate max-w-[200px]">{module.title}</h5>
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-[#0E5858]">{Math.round(percent)}%</span>
                                                         </div>
-                                                        <span className="text-[10px] font-black text-[#0E5858]">{Math.round(percent)}%</span>
+                                                        <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                                                            <motion.div
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${percent}%` }}
+                                                                className="h-full bg-gradient-to-r from-[#0E5858] to-[#00B6C1]"
+                                                            />
+                                                        </div>
+                                                        <div className="grid grid-cols-5 gap-2">
+                                                            {allTopics.map((topic, i) => {
+                                                                const isDone = isModulePassed || progress.some(p => p.user_id === selectedProfile.id && p.topic_code === topic.code);
+                                                                return (
+                                                                    <div
+                                                                        key={topic.code}
+                                                                        title={topic.title}
+                                                                        className={`h-1.5 rounded-full transition-all ${isDone ? 'bg-[#00B6C1] shadow-[0_0_8px_rgba(0,182,193,0.3)]' : 'bg-gray-100'}`}
+                                                                    />
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                    <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
-                                                        <motion.div
-                                                            initial={{ width: 0 }}
-                                                            animate={{ width: `${percent}%` }}
-                                                            className="h-full bg-gradient-to-r from-[#0E5858] to-[#00B6C1]"
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-5 gap-2">
-                                                        {allTopics.map((topic, i) => {
-                                                            const isDone = progress.some(p => p.user_id === selectedProfile.id && p.topic_code === topic.code);
-                                                            return (
-                                                                <div
-                                                                    key={topic.code}
-                                                                    title={topic.title}
-                                                                    className={`h-1.5 rounded-full transition-all ${isDone ? 'bg-[#00B6C1] shadow-[0_0_8px_rgba(0,182,193,0.3)]' : 'bg-gray-100'}`}
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            });
+                                        })()}
                                     </div>
                                 </div>
 
@@ -1664,7 +1841,7 @@ function AdminDashboardContent() {
                                                         <div className="px-4 py-1.5 bg-[#0E5858] text-white rounded-lg text-[10px] font-black uppercase tracking-widest">Score: {audit.score}/100</div>
                                                     </div>
                                                 </div>
-                                                <p className="text-xs text-[#0E5858] leading-relaxed italic font-medium">"{audit.feedback}"</p>
+                                                <p className="text-xs text-[#0E5858] leading-relaxed italic font-medium">"{audit.feedback || (audit.summary_text ? "Peer Audit Matrix Logged: Data synchronized to repository." : "No verbal feedback recorded.")}"</p>
                                                 {audit.ai_feedback && audit.ai_feedback !== 'AWAITING_REVIEW' && (
                                                     <div className="mt-4 p-4 bg-white/50 rounded-xl border border-[#00B6C1]/10">
                                                         <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest mb-1">AI System Feedback</p>
@@ -1909,7 +2086,32 @@ function AdminDashboardContent() {
                             </div>
 
                             {userError && <p className="text-red-500 text-[10px] font-bold text-center">{userError}</p>}
-                            {userSuccess && <p className="text-green-500 text-[10px] font-bold text-center">{userSuccess}</p>}
+
+                            {lastCreatedUser && (
+                                <div className="bg-[#FAFCEE] p-6 rounded-2xl border border-[#00B6C1]/20 animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center">
+                                            <CheckCircle size={14} />
+                                        </div>
+                                        <p className="text-[10px] font-black text-[#0E5858] uppercase tracking-widest">Account Successfully Provisioned</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Login Email</p>
+                                            <p className="text-xs font-bold text-[#0E5858] break-all">{lastCreatedUser.email}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Temporary Password</p>
+                                            <p className="text-xs font-bold text-orange-600 font-mono tracking-widest">{lastCreatedUser.password}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Mapped Phone</p>
+                                            <p className="text-xs font-bold text-green-600">{lastCreatedUser.phone || 'None'}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-[8px] text-[#00B6C1] font-black uppercase tracking-widest mt-4 animate-pulse">Master Registry Synchronized</p>
+                                </div>
+                            )}
 
                             <button
                                 type="submit"
@@ -2347,8 +2549,21 @@ function AdminDashboardContent() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
                                         {filteredRegistry.map(p => {
+                                            const userAssessments = assessments.filter(a => a.user_id === p.id);
+                                            const userPassedModules = new Set(userAssessments.filter(a => a.topic_code.startsWith('MODULE_')).map(a => a.topic_code.replace('MODULE_', '').toLowerCase()));
+
+                                            // Calculate explicit completions from mentor_progress
                                             const userProgress = progress.filter(pr => pr.user_id === p.id);
-                                            const globalPercent = Math.min(100, Math.round((userProgress.length / (TOTAL_SYLLABUS_TOPICS || 1)) * 100));
+                                            const explicitTopicCodes = new Set(userProgress.map(pr => pr.topic_code));
+
+                                            // Add implicit completions from passed modules
+                                            syllabusData.forEach(m => {
+                                                if (userPassedModules.has(m.id.toLowerCase())) {
+                                                    m.topics.forEach(t => explicitTopicCodes.add(t.code));
+                                                }
+                                            });
+
+                                            const globalPercent = Math.min(100, Math.round((explicitTopicCodes.size / (TOTAL_SYLLABUS_TOPICS || 1)) * 100));
 
                                             return (
                                                 <tr key={p.id} className="group hover:bg-[#FAFCEE]/50 transition-all cursor-pointer" onClick={() => setSelectedProfile(p)}>
@@ -2385,21 +2600,23 @@ function AdminDashboardContent() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6">
-                                                        <div className="flex flex-col items-center gap-1.5 min-w-[200px]">
-                                                            <div className="flex items-center gap-2 group/cred w-full justify-center">
-                                                                <Mail size={12} className="text-[#00B6C1]" />
-                                                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter w-12 text-right">Email</span>
-                                                                <code className="text-[10px] font-mono text-[#0E5858] bg-white px-3 py-1 rounded-lg border border-[#0E5858]/10 shadow-sm flex-1 text-center font-bold truncate">{p.email}</code>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 group/cred w-full justify-center">
-                                                                <BNKeyIcon size={12} className="text-orange-400" />
-                                                                <span className="text-[10px] font-black uppercase text-orange-400 tracking-tighter w-12 text-right">Pass</span>
-                                                                <code className="text-[10px] font-mono text-orange-700 bg-orange-50 px-3 py-1 rounded-lg border border-orange-100 shadow-sm flex-1 text-center font-bold tracking-widest">{p.temp_password || '---'}</code>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 group/cred w-full justify-center">
-                                                                <Phone size={12} className="text-green-500" />
-                                                                <span className="text-[10px] font-black uppercase text-green-500 tracking-tighter w-12 text-right">Phone</span>
-                                                                <code className="text-[10px] font-mono text-green-700 bg-green-50 px-3 py-1 rounded-lg border border-green-100 shadow-sm flex-1 text-center font-bold">{p.phone || 'REQUIRED'}</code>
+                                                        <div className="p-2">
+                                                            <div className="flex flex-col items-center gap-1.5 min-w-[200px]">
+                                                                <div className="flex items-center gap-2 group/cred w-full justify-center">
+                                                                    <Mail size={12} className="text-[#00B6C1]" />
+                                                                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter w-12 text-right">Email</span>
+                                                                    <code className="text-[10px] font-mono text-[#0E5858] bg-white px-3 py-1 rounded-lg border border-[#0E5858]/10 shadow-sm flex-1 text-center font-bold truncate">{p.email}</code>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 group/cred w-full justify-center">
+                                                                    <BNKeyIcon size={12} className="text-orange-400" />
+                                                                    <span className="text-[10px] font-black uppercase text-orange-400 tracking-tighter w-12 text-right">Pass</span>
+                                                                    <code className="text-[10px] font-mono text-orange-700 bg-orange-50 px-3 py-1 rounded-lg border border-orange-100 shadow-sm flex-1 text-center font-bold tracking-[0.2em]">{p.temp_password || '---'}</code>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 group/cred w-full justify-center">
+                                                                    <Phone size={12} className="text-green-500" />
+                                                                    <span className="text-[10px] font-black uppercase text-green-500 tracking-tighter w-12 text-right">Phone</span>
+                                                                    <code className="text-[10px] font-mono text-green-700 bg-green-50 px-3 py-1 rounded-lg border border-green-100 shadow-sm flex-1 text-center font-bold">{p.phone || 'REQUIRED'}</code>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </td>

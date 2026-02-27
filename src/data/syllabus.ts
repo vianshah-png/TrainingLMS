@@ -142,8 +142,8 @@ export const syllabusData: Module[] = [
                 content: 'Overview of all BN medical and lifestyle programs. Study the program structures and health inclusions.',
                 links: [
                     { label: 'Program Training Recording', url: 'https://us06web.zoom.us/rec/play/LEleYRJJTdk9jVOq1fdRn_-bSxcuczslgg-O4I2BlSLSIJaod7wq2lOYjygnCtzVxS__bNi_HZFMhF-G.ciquqYqkwaewWofq?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2F2eBla490EonzMCtdEFEACKWff_wcSIm7L-Xea2Tjs6YKJtCyCO61C1D7HkOhCEMi.91w22q29HVh6aMvb' },
-                    { label: 'BN Programs Guide', url: 'https://drive.google.com/file/d/18SQMmnz4riJ17d--GWEvVuvaLQ9iuzKy/view?usp=sharing' },
-                    { label: 'All Programs', url: 'https://docs.google.com/document/d/1QAmIPw-wfDOOioYe8pA5-aX-jvookekLTsbvHEjCEb4/edit?usp=sharing' }
+                    { label: 'All Programs', url: 'https://docs.google.com/document/d/1QAmIPw-wfDOOioYe8pA5-aX-jvookekLTsbvHEjCEb4/edit?usp=sharing' },
+                    { label: 'BN Program Pricing', url: 'https://docs.google.com/spreadsheets/d/1yVzsEmaW87XIuinrsP8akuoXfozx1hrmUfd6_me5RLs/edit?gid=954871707#gid=954871707' },
                 ]
             },
             {
@@ -213,8 +213,8 @@ export const syllabusData: Module[] = [
         topics: [
             {
                 code: 'M3-01',
-                title: 'Consultation Calls by Mentors',
-                content: 'Observe live calls by senior mentors and understand call etiquette.',
+                title: 'Consultation Calls by Counsellors',
+                content: 'Observe live calls by senior counsellors and understand call etiquette.',
                 links: [
                     { label: 'Khyati Consultation Call', url: 'https://drive.google.com/drive/u/0/folders/1no3Bzra5O3CqdDQqhOUuetrNhbAcsXNc' },
                     { label: 'Live Calls Drive', url: 'https://drive.google.com/drive/folders/1gGNjm008rEY6MoiF8hZze5t1LMkK6LpU' }
@@ -291,24 +291,12 @@ export const syllabusData: Module[] = [
                 content: 'Experience the primary dashboard interface. Learn to navigate between active clients, pending assessments, and lead queues.',
 
                 links: [
-                    { label: 'Dashboard Zoom Training', url: 'https://drive.google.com/file/d/15uCOJerhQPSOm0-mT7v69nwwYI--hvFP/view?usp=sharing' },
-                    { label: 'Explore Dashboard', url: 'https://mentor.balancenutrition.in/mentor-dashboard' }
+                    { label: 'New Dashboard Training', url: 'https://drive.google.com/file/d/15uCOJerhQPSOm0-mT7v69nwwYI--hvFP/view?usp=sharing' },
+                    { label: 'Dashboard Zoom Training', url: 'https://us06web.zoom.us/rec/play/YuxuYhPOyeSZVV6EAPk29-02-hpnKoxAeUhs-MSemS2gVkC1W7aHM5eyBtEk2DT0d6uQ0YJcosy5uI2N.cA7ZDPQ25UO-MvaE?eagerLoadZvaPages=&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2FYYZegf70CLl_i0uZkDsged9FbRJqU78GOB4iGNCfTjXgQwNuU5e9UTaov6w1BwSt.hjQaGMo8uoG722M5' },
+                    { label: 'Explore Dashboard', url: 'https://counsellor.balancenutrition.in/' }
                 ]
             },
-            {
-                code: 'M4-02',
-                title: 'Lead Management & Tracking',
-                content: 'Learn how to manage the sales funnel directly from your dashboard. Tracking leads from initial enquiry to successful conversion.',
-                links: [{ label: 'Lead Management Video', url: 'https://youtu.be/WpaY3G9RGyY' }]
-            },
-            {
-                code: 'M4-03',
-                title: 'Creating Payment Links',
-                content: 'Master the process of generating secure payment links for clients based on program selection.',
-                links: [
-                    { label: 'Payment Links Guide', url: 'https://drive.google.com/file/d/1UkZl0brpE7Z1OYPw5-hB0vtyc_XiNFAD/view' }
-                ]
-            },
+
         ]
     },
     // ===== MODULE 3: Sales skill training (Repositioned from M5) =====

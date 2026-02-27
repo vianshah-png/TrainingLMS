@@ -109,6 +109,11 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
     );
     const embedUrl = getEmbedUrl(mediaLink?.url);
 
+    // Links to display in the UI (hides the media link if it's playing as a video, unless in edit mode)
+    const displayLinks = isEditMode
+        ? topic.links
+        : topic.links?.filter(link => !(embedUrl && link === mediaLink));
+
     // Persist progress to local storage
     useEffect(() => {
         const key = `bn-topic-progress-${userId || 'anon'}-${topic.code}`;
@@ -333,7 +338,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 </div>
                             )}
 
-                            {topic.links && topic.links.length > 0 && !topic.caseStudyLinks && (
+                            {displayLinks && displayLinks.length > 0 && !topic.caseStudyLinks && (
                                 <div className="space-y-6 flex-1 min-w-[300px]">
                                     <div className="flex items-center justify-between mb-4 px-1">
                                         <div className="flex items-center gap-4">
@@ -351,7 +356,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
 
                                     {isEditMode ? (
                                         <div className="space-y-4">
-                                            {topic.links.map((link, idx) => (
+                                            {topic.links?.map((link, idx) => (
                                                 <div key={idx} className="flex flex-col sm:flex-row gap-4 items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
                                                     <input
                                                         type="text"
@@ -370,8 +375,8 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                             value={link.url}
                                                             placeholder="https://"
                                                             className={`w-full p-3 border-2 border-dashed rounded-xl focus:border-[#00B6C1] outline-none text-sm ${(link.url.includes('youtu') || link.url.includes('drive') || link.url.includes('zoom'))
-                                                                    ? 'border-[#00B6C1]/50 text-[#00B6C1] bg-[#00B6C1]/5'
-                                                                    : 'border-[#0E5858]/20 text-gray-500'
+                                                                ? 'border-[#00B6C1]/50 text-[#00B6C1] bg-[#00B6C1]/5'
+                                                                : 'border-[#0E5858]/20 text-gray-500'
                                                                 }`}
                                                             onChange={(e) => {
                                                                 const newLinks = [...(topic.links || [])];
@@ -409,7 +414,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         </div>
                                     ) : topic.layout === 'grid' ? (
                                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                            {topic.links.map(link => (
+                                            {displayLinks.map(link => (
                                                 <motion.a
                                                     key={link.label}
                                                     href={link.url}
@@ -421,7 +426,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                             e.preventDefault();
                                                             setShowHealthPopup(true);
                                                         }
-                                                        logActivity('view_content', { topicCode: topic.code, contentTitle: link.label });
+                                                        logActivity('click_link', { topicCode: topic.code, contentTitle: link.label });
                                                     }}
                                                     className="group/grid-card flex flex-col items-center text-center p-6 bg-white rounded-[2rem] shadow-sm hover:shadow-2xl transition-all border border-[#0E5858]/5 hover:border-[#00B6C1]/20 relative overflow-hidden aspect-[4/5] justify-center"
                                                 >
@@ -452,13 +457,13 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {topic.links.map(link => (
+                                            {displayLinks.map(link => (
                                                 <a
                                                     key={link.label}
                                                     href={link.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    onClick={() => logActivity('view_content', { topicCode: topic.code, contentTitle: link.label })}
+                                                    onClick={() => logActivity('click_link', { topicCode: topic.code, contentTitle: link.label })}
                                                     className="group/link flex items-center justify-between px-4 py-3 bg-white text-[#0E5858] shadow-sm hover:shadow-xl rounded-2xl text-[11px] font-bold border border-[#0E5858]/5 hover:border-[#00B6C1]/20 transition-all"
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -544,6 +549,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                     <button
                                         onClick={() => {
                                             setVideoCompleted(true);
+                                            logActivity('click_audit', { topicCode: topic.code, contentTitle: topic.title });
                                             setTimeout(() => {
                                                 document.getElementById(`assignment-${topic.code}`)?.scrollIntoView({ behavior: 'smooth' });
                                             }, 100);
@@ -563,7 +569,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                 whileHover={{ y: -5, scale: 1.02 }}
                                                 onClick={() => {
                                                     setSelectedCaseStudy(link);
-                                                    logActivity('view_content', { topicCode: topic.code, contentTitle: `Case Study #${i + 1}` });
+                                                    logActivity('view_case_study', { topicCode: topic.code, contentTitle: `Case Study #${i + 1}` });
                                                 }}
                                                 className="aspect-[4/5] bg-[#FAFCEE] border border-[#0E5858]/5 rounded-2xl p-4 flex flex-col justify-between cursor-pointer group/case shadow-sm hover:shadow-xl hover:bg-white transition-all overflow-hidden relative"
                                             >
@@ -586,7 +592,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 <div className={`transition-all duration-700 ${videoCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}>
                                     <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-gray-100 ring-1 ring-black/[0.03]">
                                         {embedUrl.includes('youtube.com') ? (
-                                            <YouTubePlayer videoId={embedUrl.split('/').pop() || ''} onComplete={handleVideoComplete} />
+                                            <YouTubePlayer videoId={embedUrl.split('/').pop() || ''} onComplete={handleVideoComplete} topicCode={topic.code} topicTitle={topic.title} />
                                         ) : (
                                             <iframe
                                                 src={embedUrl}

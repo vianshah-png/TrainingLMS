@@ -27,7 +27,9 @@ import {
   Bell,
   Send,
   XCircle,
-  Loader2
+  Loader2,
+  Star,
+  Brain
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { syllabusData } from "@/data/syllabus";
@@ -35,6 +37,8 @@ import { motion, Variants, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import DashboardTour from "@/components/DashboardTour";
+
+const SUPPORT_WHATSAPP = "91932314XXXX"; // Placeholder: user can define this
 
 export default function Home() {
   const router = useRouter();
@@ -46,7 +50,7 @@ export default function Home() {
   const [userName, setUserName] = useState<string>("");
   const [trainingBuddy, setTrainingBuddy] = useState<string>("");
   const [dynamicContent, setDynamicContent] = useState<any[]>([]);
-  const [allMentors, setAllMentors] = useState<any[]>([]);
+  const [allCounsellors, setAllCounsellors] = useState<any[]>([]);
   const [showBuddyModal, setShowBuddyModal] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -77,12 +81,18 @@ export default function Home() {
       setUserId(session.user.id);
       setUserName(session.user.user_metadata?.full_name || "Counsellor");
 
-      // 0. Fetch Profile for Training Buddy
+      // 0. Fetch Profile for Training Buddy AND role check
       const { data: profile } = await supabase
         .from('profiles')
-        .select('training_buddy')
+        .select('training_buddy, role')
         .eq('id', session.user.id)
         .single();
+
+      // Redirect trainer buddies, admins, and moderators to the admin panel
+      if (profile?.role === 'trainer buddy' || profile?.role === 'admin' || profile?.role === 'moderator') {
+        router.push('/admin');
+        return;
+      }
 
       if (profile?.training_buddy) {
         setTrainingBuddy(profile.training_buddy);
@@ -146,16 +156,16 @@ export default function Home() {
       });
 
       // 4. Resolve Trainer Buddy Details
-      let mentorData: any[] = [];
+      let counsellorData: any[] = [];
       if (profile?.training_buddy) {
         let emails = [];
         try {
           const parsed = JSON.parse(profile.training_buddy);
-          mentorData = (Array.isArray(parsed) ? parsed : [parsed]).map(v => ({
+          counsellorData = (Array.isArray(parsed) ? parsed : [parsed]).map(v => ({
             full_name: v.full_name || v.name || "Training Buddy",
             email: v.email || "",
             phone: v.phone || "",
-            role: v.role || "Training Mentor"
+            role: v.role || "Training Counsellor"
           }));
         } catch (e) {
           emails = profile.training_buddy.split(',').map((e: string) => e.trim());
@@ -163,16 +173,16 @@ export default function Home() {
             .from('profiles')
             .select('full_name, email, role, phone')
             .in('email', emails);
-          mentorData = (mentors || []).map(m => ({
+          counsellorData = (mentors || []).map(m => ({
             full_name: m.full_name,
             email: m.email,
             phone: m.phone,
-            role: m.role || 'Training Mentor'
+            role: m.role || 'Training Counsellor'
           }));
         }
       }
 
-      setAllMentors(mentorData);
+      setAllCounsellors(counsellorData);
 
       // 5. Fetch Last Activity to determine Resume Module
       const { data: lastLog } = await supabase
@@ -329,7 +339,7 @@ export default function Home() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-4 w-80 bg-white rounded-[2rem] shadow-2xl border border-[#0E5858]/5 z-[110] overflow-hidden"
+                    className="absolute right-0 mt-4 w-96 bg-white rounded-[2rem] shadow-2xl border border-[#0E5858]/5 z-[110] overflow-hidden"
                   >
                     <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-[#FAFCEE]/50">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-[#0E5858]">Notifications</h4>
@@ -340,25 +350,166 @@ export default function Home() {
                         <X size={14} />
                       </button>
                     </div>
-                    <div className="max-h-[400px] overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    <div className="max-h-[500px] overflow-y-auto p-4 space-y-4 custom-scrollbar">
                       {notifications.length > 0 ? notifications.map((n) => (
                         <div
                           key={n.id}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer ${n.is_read ? 'bg-white border-gray-50' : 'bg-[#FAFCEE] border-[#00B6C1]/20 shadow-sm'}`}
-                          onClick={async () => {
-                            if (!n.is_read) {
-                              await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
-                              setNotifications(notifications.map(item => item.id === n.id ? { ...item, is_read: true } : item));
-                              setUnreadCount(prev => Math.max(0, prev - 1));
-                            }
-                          }}
+                          className={`p-5 rounded-[2rem] border transition-all ${n.is_read && !n.template ? 'bg-white border-gray-50' : 'bg-[#FAFCEE] border-[#00B6C1]/20 shadow-sm'} ${n.interaction_response ? 'opacity-75' : ''}`}
                         >
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-2">
                             {n.type === 'alert' || n.type === 'warning' ? <Info size={12} className="text-red-500" /> : <Sparkles size={12} className="text-[#00B6C1]" />}
-                            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#0E5858] truncate">{n.title}</h5>
+                            <h5 className="text-[11px] font-black uppercase tracking-widest text-[#0E5858] truncate">{n.title}</h5>
                           </div>
-                          <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{n.message}</p>
-                          <p className="text-[8px] text-gray-300 font-bold uppercase tracking-[0.1em] mt-2">{new Date(n.created_at).toLocaleDateString()}</p>
+                          <p className="text-[12px] text-gray-500 leading-relaxed mb-4">{n.message}</p>
+
+                          {/* Interaction UI */}
+                          {!n.interaction_response ? (
+                            <div className="space-y-3">
+                              {n.template === 'ack' && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const response = { status: 'acknowledged', at: new Date().toISOString() };
+                                    await supabase.from('notifications').update({ interaction_response: response, is_read: true }).eq('id', n.id);
+                                    setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, interaction_response: response, is_read: true } : item));
+                                    setUnreadCount(p => Math.max(0, p - 1));
+                                  }}
+                                  className="w-full py-2 bg-[#0E5858] text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-[#00B6C1] transition-all"
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+
+                              {n.template === 'feedback' && (
+                                <div className="space-y-3 pt-2">
+                                  <div className="flex justify-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => {
+                                      const currentRating = (n as any)._pendingRating || 0;
+                                      return (
+                                        <button
+                                          key={star}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, _pendingRating: star } : item));
+                                          }}
+                                          className={`transition-all ${currentRating >= star ? 'text-[#FFCC00]' : 'text-gray-200 hover:text-[#FFCC00]/50'}`}
+                                        >
+                                          <Star size={16} fill={currentRating >= star ? "currentColor" : "none"} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="relative">
+                                    <textarea
+                                      id={`feedback-${n.id}`}
+                                      placeholder="Add an optional note..."
+                                      className="w-full bg-white border border-[#0E5858]/10 rounded-xl p-3 text-[10px] outline-none focus:ring-1 focus:ring-[#00B6C1] h-16 resize-none pr-8"
+                                    />
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const text = (document.getElementById(`feedback-${n.id}`) as HTMLTextAreaElement).value;
+                                        const rating = (n as any)._pendingRating || 0;
+                                        const response = { rating, feedback: text, at: new Date().toISOString() };
+                                        await supabase.from('notifications').update({ interaction_response: response, is_read: true }).eq('id', n.id);
+                                        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, interaction_response: response, is_read: true } : item));
+                                        setUnreadCount(p => Math.max(0, p - 1));
+                                      }}
+                                      className="absolute bottom-2 right-2 p-1.5 bg-[#0E5858] text-white rounded-lg hover:bg-[#00B6C1] transition-all"
+                                      title="Submit"
+                                    >
+                                      <Send size={10} />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {n.template === 'retake' && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const response = { status: 'preparing_retake', at: new Date().toISOString() };
+                                    await supabase.from('notifications').update({ interaction_response: response, is_read: true }).eq('id', n.id);
+                                    setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, interaction_response: response, is_read: true } : item));
+                                    setUnreadCount(p => Math.max(0, p - 1));
+                                  }}
+                                  className="w-full py-2 bg-red-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-red-600 transition-all flex items-center justify-center gap-2"
+                                >
+                                  <Brain size={12} /> Revisit Training
+                                </button>
+                              )}
+
+                              {(n.template === 'poll' || n.template === 'rating') && (
+                                <div className="flex justify-center gap-2 pt-2">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const response = { rating: star, at: new Date().toISOString() };
+                                        await supabase.from('notifications').update({ interaction_response: response, is_read: true }).eq('id', n.id);
+                                        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, interaction_response: response, is_read: true } : item));
+                                        setUnreadCount(p => Math.max(0, p - 1));
+                                      }}
+                                      className="text-gray-200 hover:text-[#FFCC00] transition-colors group"
+                                    >
+                                      <Star size={22} fill="currentColor" className="group-hover:scale-110 transition-transform" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {(!n.template || n.template === 'none' || n.template === 'inactive') && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const response = { status: 'read', at: new Date().toISOString() };
+                                    await supabase.from('notifications').update({ interaction_response: response, is_read: true }).eq('id', n.id);
+                                    setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, interaction_response: response, is_read: true } : item));
+                                    setUnreadCount(p => Math.max(0, p - 1));
+                                  }}
+                                  className="w-full py-2 border border-[#0E5858]/10 text-[#0E5858]/40 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-white hover:text-[#0E5858] transition-all"
+                                >
+                                  Dismiss Message
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="pt-3 border-t border-[#0E5858]/5 flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 size={12} className="text-green-500" />
+                                <p className="text-[9px] font-bold text-[#0E5858] uppercase tracking-widest">
+                                  Status: Mission Accomplished
+                                </p>
+                              </div>
+                              {n.interaction_response.feedback && (
+                                <p className="text-[10px] text-gray-400 italic font-medium pl-5 line-clamp-1 border-l-2 border-[#0E5858]/10 ml-1.5">"{n.interaction_response.feedback}"</p>
+                              )}
+                              {n.interaction_response.rating > 0 && (
+                                <div className="flex gap-0.5 pl-5">
+                                  {[1, 2, 3, 4, 5].map(s => (
+                                    <Star key={s} size={8} fill={n.interaction_response.rating >= s ? "#FFCC00" : "none"} className={n.interaction_response.rating >= s ? "text-[#FFCC00]" : "text-gray-200"} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-center mt-3">
+                            <p className="text-[8px] text-gray-300 font-bold uppercase tracking-[0.1em]">{new Date(n.created_at).toLocaleDateString()}</p>
+                            {!n.is_read && !n.template && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
+                                  setNotifications(notifications.map(item => item.id === n.id ? { ...item, is_read: true } : item));
+                                  setUnreadCount(prev => Math.max(0, prev - 1));
+                                }}
+                                className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest hover:underline"
+                              >
+                                Mark Ready
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )) : (
                         <div className="py-12 text-center opacity-30">
@@ -372,17 +523,17 @@ export default function Home() {
               </AnimatePresence>
             </div>
 
-            {allMentors.length > 0 && (
+            {allCounsellors.length > 0 && (
               <div className="flex items-center gap-3">
-                {allMentors[0]?.phone && (
+                {allCounsellors[0]?.phone && (
                   <a
-                    href={`https://wa.me/${(allMentors[0]?.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                    href={`https://wa.me/${(allCounsellors[0]?.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                       `Hi! I'm currently on my *BN Academy Dashboard*.\n\nCurrent Progress: ${userStats.progress}%\nTests Taken: ${userStats.quizzes}\nAverage Score: ${userStats.avgScore}%\n\nCan you please help me with some queries?`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#25D366] shadow-sm border border-[#0E5858]/5 hover:bg-[#25D366] hover:text-white hover:shadow-xl hover:-translate-y-1 transition-all group"
-                    title={`WhatsApp ${allMentors[0].full_name}`}
+                    title={`WhatsApp ${allCounsellors[0].full_name}`}
                   >
                     <MessageSquare size={24} className="group-hover:scale-110 transition-transform" />
                   </a>
@@ -390,15 +541,15 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setEmailForm({
-                      to: allMentors[0]?.email,
+                      to: allCounsellors[0]?.email,
                       subject: "Inquiry from Academy Counsellor",
-                      message: `Hi ${allMentors[0]?.full_name},\n\nI need some help regarding...`,
-                      userName: allMentors[0]?.full_name
+                      message: `Hi ${allCounsellors[0]?.full_name},\n\nI need some help regarding...`,
+                      userName: allCounsellors[0]?.full_name
                     });
                     setIsEmailModalOpen(true);
                   }}
                   className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#0E5858] shadow-sm border border-[#0E5858]/5 hover:bg-[#0E5858] hover:text-white hover:shadow-xl hover:-translate-y-1 transition-all group"
-                  title={`Email ${allMentors[0]?.full_name}`}
+                  title={`Email ${allCounsellors[0]?.full_name}`}
                 >
                   <Mail size={24} className="group-hover:scale-110 transition-transform" />
                 </button>
@@ -421,7 +572,7 @@ export default function Home() {
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Training Buddy</p>
                 <div className="flex items-center gap-1">
                   <p className="text-lg font-serif text-[#0E5858] truncate max-w-[100px]">
-                    {allMentors.length > 0 ? (allMentors.length > 1 ? `${allMentors.length} Mentors` : allMentors[0].full_name.split(' ')[0]) : 'Unassigned'}
+                    {allCounsellors.length > 0 ? (allCounsellors.length > 1 ? `${allCounsellors.length} Counsellors` : allCounsellors[0].full_name.split(' ')[0]) : 'Unassigned'}
                   </p>
                   <Info size={10} className="text-[#00B6C1]" />
                 </div>
@@ -492,8 +643,8 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* Training Support & Activity Trail */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-16">
+        {/* Training Support Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16 max-w-5xl">
           {/* Quick Access: Training Support */}
           <motion.section id="tour-buddy" variants={itemVariants} className="lg:col-span-2">
             <div className="flex items-center justify-between mb-8">
@@ -503,33 +654,33 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {allMentors.slice(0, 4).map((mentor, i) => (
+              {allCounsellors.slice(0, 4).map((counsellor, i) => (
                 <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-[#0E5858]/5 shadow-sm hover:shadow-xl hover:shadow-[#0E5858]/5 transition-all flex items-center justify-between group">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] font-black text-lg border border-[#0E5858]/5 group-hover:bg-[#0E5858] group-hover:text-white transition-colors">
-                      {mentor.full_name?.[0] || 'B'}
+                      {counsellor.full_name?.[0] || 'B'}
                     </div>
                     <div>
-                      <h4 className="text-sm font-serif font-bold text-[#0E5858] mb-0.5">{mentor.full_name}</h4>
-                      <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-widest opacity-70">{mentor.role}</p>
+                      <h4 className="text-sm font-serif font-bold text-[#0E5858] mb-0.5">{counsellor.full_name}</h4>
+                      <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-widest opacity-70">{counsellor.role}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <a href={`tel:${mentor.phone}`} className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#0E5858] hover:bg-white hover:shadow-sm transition-all">
+                    <a href={`tel:${counsellor.phone}`} className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#0E5858] hover:bg-white hover:shadow-sm transition-all">
                       <Phone size={14} />
                     </a>
-                    {mentor.phone && (
-                      <a href={`https://wa.me/${mentor.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-green-500 hover:bg-white hover:shadow-sm transition-all">
+                    {counsellor.phone && (
+                      <a href={`https://wa.me/${counsellor.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 hover:text-green-500 hover:bg-white hover:shadow-sm transition-all">
                         <MessageSquare size={14} />
                       </a>
                     )}
                     <button
                       onClick={() => {
                         setEmailForm({
-                          to: mentor.email,
+                          to: counsellor.email,
                           subject: "Inquiry from Academy Counsellor",
-                          message: `Hi ${mentor.full_name},\n\nI had a question regarding the training...`,
-                          userName: mentor.full_name
+                          message: `Hi ${counsellor.full_name},\n\nI had a question regarding the training...`,
+                          userName: counsellor.full_name
                         });
                         setIsEmailModalOpen(true);
                       }}
@@ -541,37 +692,6 @@ export default function Home() {
                   </div>
                 </div>
               ))}
-            </div>
-          </motion.section>
-
-          {/* Activity Trail */}
-          <motion.section variants={itemVariants} className="bg-white p-8 rounded-[3.5rem] border border-[#0E5858]/5 shadow-sm overflow-hidden flex flex-col h-full">
-            <h3 className="text-xl font-serif text-[#0E5858] mb-6 flex items-center gap-3">
-              <Activity size={20} className="text-[#00B6C1]" />
-              Activity Trail
-            </h3>
-            <div className="space-y-6 overflow-y-auto pr-2 scrollbar-hide flex-grow">
-              {activityLogs.length > 0 ? activityLogs.map((log, i) => (
-                <div key={log.id} className="relative pl-6 pb-2 group">
-                  {i !== activityLogs.length - 1 && (
-                    <div className="absolute left-[3px] top-4 bottom-0 w-[1px] bg-gray-100 group-last:hidden" />
-                  )}
-                  <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-[#00B6C1] ring-4 ring-[#00B6C1]/10" />
-                  <div>
-                    <p className="text-[11px] font-bold text-[#0E5858] leading-tight mb-1">
-                      {log.activity_type.replace('_', ' ')}: <span className="text-gray-400">{log.content_title || log.topic_code}</span>
-                    </p>
-                    <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">
-                      {new Date(log.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-              )) : (
-                <div className="flex flex-col items-center justify-center py-10 opacity-30">
-                  <Clock size={40} className="mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Awaiting Activity...</p>
-                </div>
-              )}
             </div>
           </motion.section>
         </div>
@@ -655,29 +775,29 @@ export default function Home() {
                     <User size={28} />
                   </div>
                   <h3 className="text-4xl font-serif text-[#0E5858]">Training Buddies</h3>
-                  <p className="text-sm text-gray-400 font-medium italic mt-2">Connecting you with mentors for guidance.</p>
+                  <p className="text-sm text-gray-400 font-medium italic mt-2">Connecting you with counsellors for guidance.</p>
                 </header>
 
                 <div className="space-y-4 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
-                  {allMentors.length > 0 ? allMentors.map((mentor, i) => (
+                  {allCounsellors.length > 0 ? allCounsellors.map((counsellor, i) => (
                     <div key={i} className="p-6 bg-gray-50 rounded-3xl border border-gray-100 group flex items-center justify-between hover:bg-white hover:shadow-xl hover:shadow-gray-200/50 transition-all">
                       <div>
-                        <h4 className="text-lg font-serif text-[#0E5858] mb-0.5">{mentor.full_name}</h4>
-                        <p className="text-[9px] font-black text-[#00B6C1] uppercase tracking-[0.2em]">{mentor.role}</p>
+                        <h4 className="text-lg font-serif text-[#0E5858] mb-0.5">{counsellor.full_name}</h4>
+                        <p className="text-[9px] font-black text-[#00B6C1] uppercase tracking-[0.2em]">{counsellor.role}</p>
                       </div>
                       <div className="flex gap-2">
-                        {mentor.phone && (
-                          <a href={`https://wa.me/${mentor.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-3 bg-white rounded-xl text-gray-400 hover:text-green-500 hover:shadow-md transition-all">
+                        {counsellor.phone && (
+                          <a href={`https://wa.me/${counsellor.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-3 bg-white rounded-xl text-gray-400 hover:text-green-500 hover:shadow-md transition-all">
                             <MessageSquare size={16} />
                           </a>
                         )}
                         <button
                           onClick={() => {
                             setEmailForm({
-                              to: mentor.email,
+                              to: counsellor.email,
                               subject: "Learning Support Request",
-                              message: `Hi ${mentor.full_name},\n\n`,
-                              userName: mentor.full_name
+                              message: `Hi ${counsellor.full_name},\n\n`,
+                              userName: counsellor.full_name
                             });
                             setIsEmailModalOpen(true);
                           }}
@@ -686,13 +806,13 @@ export default function Home() {
                         >
                           <Mail size={16} />
                         </button>
-                        <a href={`tel:${mentor.phone || '#'}`} className={`p-3 bg-white rounded-xl ${mentor.phone ? 'text-gray-400 hover:text-[#00B6C1]' : 'text-gray-200 cursor-not-allowed'} hover:shadow-md transition-all`}>
+                        <a href={`tel:${counsellor.phone || '#'}`} className={`p-3 bg-white rounded-xl ${counsellor.phone ? 'text-gray-400 hover:text-[#00B6C1]' : 'text-gray-200 cursor-not-allowed'} hover:shadow-md transition-all`}>
                           <Phone size={16} />
                         </a>
                       </div>
                     </div>
                   )) : (
-                    <p className="text-center text-gray-400 italic py-10">No mentors assigned yet.</p>
+                    <p className="text-center text-gray-400 italic py-10">No counsellors assigned yet.</p>
                   )}
                 </div>
 
@@ -767,7 +887,21 @@ export default function Home() {
                 </button>
 
                 {emailSuccess && <p className="text-green-500 text-[9px] font-black text-center uppercase tracking-widest animate-pulse">{emailSuccess}</p>}
-                {emailError && <p className="text-red-500 text-[9px] font-black text-center uppercase tracking-widest">{emailError}</p>}
+                {emailError && (
+                  <div className="space-y-4">
+                    <p className="text-red-500 text-[9px] font-black text-center uppercase tracking-widest">{emailError}</p>
+                    <div className="flex justify-center">
+                      <a
+                        href={`https://wa.me/${allCounsellors.find(m => m.email === emailForm.to)?.phone?.replace(/[^0-9]/g, '') || SUPPORT_WHATSAPP}?text=${encodeURIComponent(emailForm.message)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 bg-[#25D366] text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:brightness-110 transition-all flex items-center gap-2"
+                      >
+                        <MessageSquare size={14} /> Send via WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

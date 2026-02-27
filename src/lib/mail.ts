@@ -1,8 +1,16 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-if (!process.env.RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY is missing. Email notifications will be disabled.');
+export const SENDER_EMAIL = 'workwithus@balancenutrition.in';
+
+if (!process.env.GMAIL_APP_PASSWORD || !process.env.GMAIL_USER) {
+    console.warn('GMAIL_APP_PASSWORD or GMAIL_USER is missing. Please add to .env.local to enable email sending via nodemailer.');
 }
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
-export const SENDER_EMAIL = 'workwithus@balancenutrition.in';
+// Reusable transporter using Gmail
+export const mailer = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.GMAIL_USER || SENDER_EMAIL,
+        pass: process.env.GMAIL_APP_PASSWORD || '',
+    },
+});

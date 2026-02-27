@@ -65,8 +65,8 @@ export default function ModulePage() {
     const [dragItem, setDragItem] = useState<number | null>(null);
     const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
-    // Mentor context for WhatsApp 
-    const [assignedMentors, setAssignedMentors] = useState<any[]>([]);
+    // Counsellor context for WhatsApp 
+    const [assignedCounsellors, setAssignedCounsellors] = useState<any[]>([]);
     const [overallProgress, setOverallProgress] = useState(0);
 
     const handleTopicEdit = (topicCode: string, updatedFields: Partial<any>) => {
@@ -157,7 +157,6 @@ export default function ModulePage() {
                     content: edits.content !== undefined ? edits.content : (existing?.content || localTopic?.content || ''),
                     links: edits.links || existing?.links || localTopic?.links || [],
                     outcome: edits.outcome !== undefined ? edits.outcome : (existing?.outcome || localTopic?.outcome || ''),
-                    layout: edits.layout !== undefined ? edits.layout : (existing?.layout || localTopic?.layout || null),
                     updated_at: new Date().toISOString()
                 };
 
@@ -239,7 +238,7 @@ export default function ModulePage() {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         if (moduleId && baseModule) {
-            logActivity('view_topic', { moduleId, contentTitle: baseModule.title });
+            logActivity('view_module', { moduleId, contentTitle: baseModule.title });
         }
     }, [moduleId, baseModule]);
 
@@ -330,10 +329,10 @@ export default function ModulePage() {
                     try {
                         const parsed = JSON.parse(profile.training_buddy);
                         const buddiesArray = Array.isArray(parsed) ? parsed : [parsed];
-                        setAssignedMentors(buddiesArray);
+                        setAssignedCounsellors(buddiesArray);
                     } catch (e) {
                         // Fallback structure
-                        setAssignedMentors([{ full_name: profile.training_buddy, phone: "" }]);
+                        setAssignedCounsellors([{ full_name: profile.training_buddy, phone: "" }]);
                     }
                 }
 
@@ -985,7 +984,10 @@ export default function ModulePage() {
                             ].map((link, i) => (
                                 <motion.a
                                     key={i} href={link.url} target={link.isPopup ? undefined : "_blank"}
-                                    onClick={(e) => { if (link.isPopup) { e.preventDefault(); setShowHealthPopup(true); } }}
+                                    onClick={(e) => {
+                                        if (link.isPopup) { e.preventDefault(); setShowHealthPopup(true); }
+                                        logActivity('click_link', { contentTitle: 'Ecosystem Hub: ' + link.title });
+                                    }}
                                     whileHover={{ y: -8, scale: 1.02 }}
                                     className="premium-card p-8 group relative overflow-hidden flex flex-col items-center text-center hover:border-[#00B6C1]/30 transition-all border border-transparent bg-white shadow-xl"
                                 >
@@ -1092,14 +1094,14 @@ export default function ModulePage() {
             </footer>
 
             {/* Floating WhatsApp Action for Specific Module */}
-            {assignedMentors.length > 0 && assignedMentors[0].phone && (
+            {assignedCounsellors.length > 0 && assignedCounsellors[0].phone && (
                 <motion.a
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    href={`https://wa.me/${assignedMentors[0].phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                        `Hi ${assignedMentors[0].name?.split(' ')[0] || 'Trainer'}, I am currently working on ${baseModule.title} (Overall Progress: ${overallProgress}%). I have a query regarding: `
+                    href={`https://wa.me/${assignedCounsellors[0].phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Hi ${assignedCounsellors[0].full_name?.split(' ')[0] || 'Trainer'}, I am currently working on ${baseModule.title} (Overall Progress: ${overallProgress}%). I have a query regarding: `
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1107,7 +1109,7 @@ export default function ModulePage() {
                 >
                     <MessageSquare size={24} className="group-hover:animate-pulse" />
                     <span className="text-sm font-bold truncate max-w-0 group-hover:max-w-[200px] transition-all duration-500 overflow-hidden whitespace-nowrap">
-                        Ask {assignedMentors[0].name?.split(' ')[0] || 'Trainer'}
+                        Ask {assignedCounsellors[0].full_name?.split(' ')[0] || 'Counsellor'}
                     </span>
                 </motion.a>
             )}

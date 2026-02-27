@@ -56,9 +56,16 @@ export default function RootLayout({
         // Safe Profile Sync: Only insert if missing to prevent overwriting admin-set data (phone, buddy)
         const { data: existingProfile } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, role, full_name')
           .eq('id', session.user.id)
           .single();
+
+        let finalRole = role; // Default to metadata role
+        if (existingProfile) {
+          finalRole = existingProfile.role || role;
+          setUserRole(finalRole);
+          if (existingProfile.full_name) setUserName(existingProfile.full_name);
+        }
 
         if (!existingProfile) {
           await supabase.from('profiles').insert({
@@ -78,12 +85,12 @@ export default function RootLayout({
         setNotifications(notifs || []);
 
         if (isLoginPage) {
-          if (role === 'admin') {
+          if (finalRole === 'admin' || finalRole === 'trainer buddy' || finalRole === 'moderator') {
             router.push("/admin");
           } else {
             router.push("/");
           }
-        } else if (pathname.startsWith('/admin') && role !== 'admin') {
+        } else if (pathname.startsWith('/admin') && finalRole !== 'admin' && finalRole !== 'trainer buddy' && finalRole !== 'moderator') {
           router.push("/");
         }
       } else if (!isLoginPage) {
@@ -112,7 +119,7 @@ export default function RootLayout({
           .then(({ data }) => setNotifications(data || []));
 
         if (isLoginPage) {
-          if (role === 'admin') {
+          if (role === 'admin' || role === 'trainer buddy' || role === 'moderator') {
             router.push("/admin");
           } else {
             router.push("/");

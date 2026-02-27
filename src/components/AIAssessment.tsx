@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Brain, CheckCircle2, ChevronRight, Loader2, Lock, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
+import { syllabusData } from "@/data/syllabus";
 
 interface Question {
     type?: 'mcq' | 'text';
@@ -62,6 +63,7 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
 
     const generateTest = async () => {
         setLoading(true);
+        logActivity('start_quiz', { topicCode, contentTitle: topicTitle });
         try {
             // Find links related to this topic from syllabusData if possible. Since we don't have direct access here easily,
             // we will just pull it based on topicCode if we import syllabusData, but it's okay to just pass what we have
@@ -139,6 +141,25 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                     raw_data: { questions, answers: finalAnswers, gradedResults: gradeData.results, time_spent: 900 - timeLeft }
                 }]);
 
+                // Robust Fix: If this is a module-level quiz, mark all topics in this module as complete in mentor_progress
+                if (topicCode.startsWith('MODULE_')) {
+                    const moduleId = topicCode.replace('MODULE_', '').toLowerCase();
+                    const module = syllabusData.find(m => m.id === moduleId);
+                    if (module) {
+                        const progressUpdates = module.topics.map(t => ({
+                            user_id: session.user.id,
+                            topic_code: t.code,
+                            module_id: moduleId
+                        }));
+
+                        if (progressUpdates.length > 0) {
+                            await supabase.from('mentor_progress').upsert(progressUpdates, {
+                                onConflict: 'user_id,topic_code'
+                            });
+                        }
+                    }
+                }
+
                 // Log to activity trail
                 await logActivity(topicCode.startsWith('MODULE_') ? 'complete_module' : 'complete_quiz', {
                     topicCode,
@@ -146,18 +167,21 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                     score: finalScore
                 });
 
-                // Notify Training Buddies (Background)
-                fetch('/api/notify-buddy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: session.user.id,
-                        topicCode,
-                        score: finalScore,
-                        totalQuestions: gradeData.total,
-                        results: gradeData.results
-                    })
-                }).catch(err => console.error("Buddy Notification Failed:", err));
+                try {
+                    fetch('/api/notify-buddy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: session.user.id,
+                            topicCode,
+                            score: finalScore,
+                            totalQuestions: gradeData.total,
+                            results: gradeData.results
+                        })
+                    }).catch(err => console.error("Buddy Notification Failed:", err));
+                } catch (e) {
+                    console.error("Buddy Notification error:", e);
+                }
             }
 
             setShowResult(true);

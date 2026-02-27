@@ -22,7 +22,17 @@ export default function LoginPage() {
         const checkUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                router.push("/");
+                // Check role to route trainer buddies to admin
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single();
+                if (profile?.role === 'trainer buddy' || profile?.role === 'admin' || profile?.role === 'moderator') {
+                    router.push("/admin");
+                } else {
+                    router.push("/");
+                }
             }
         };
         checkUser();
@@ -43,8 +53,18 @@ export default function LoginPage() {
             setError(error.message);
             setLoading(false);
         } else {
-            // Role verification logic could go here if needed
-            router.push("/");
+            // Check user role to determine where to redirect
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', data.session.user.id)
+                .single();
+
+            if (profile?.role === 'trainer buddy' || profile?.role === 'admin' || profile?.role === 'moderator') {
+                router.push("/admin");
+            } else {
+                router.push("/");
+            }
         }
     };
 
@@ -199,14 +219,9 @@ export default function LoginPage() {
 
                                 {selectedRole === 'interviewee' && (
                                     <div className="flex bg-[#FAFCEE] rounded-2xl p-1 mb-8 border border-[#0E5858]/5">
-                                        <button
-                                            onClick={() => setMode('login')}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/40'}`}
-                                        > Log In </button>
-                                        <button
-                                            onClick={() => setMode('signup')}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'signup' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/40'}`}
-                                        > Sign Up </button>
+                                        <div className="flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#0E5858] text-white shadow-lg text-center">
+                                            Authorized Access Only
+                                        </div>
                                     </div>
                                 )}
 

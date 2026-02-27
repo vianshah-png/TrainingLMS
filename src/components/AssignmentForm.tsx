@@ -309,7 +309,10 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                             </div>
                         </div>
                         <button
-                            onClick={() => setStep("questions")}
+                            onClick={() => {
+                                setStep("questions");
+                                logActivity('start_assignment', { topicCode, contentTitle: 'Peer Audit Task Initialized' });
+                            }}
                             disabled={selectedCompanies.length < 2 || selectedDieticians.length < 2}
                             className={`w-full py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.25em] flex items-center justify-center gap-3 transition-all ${selectedCompanies.length < 2 || selectedDieticians.length < 2 ? 'bg-gray-50 text-gray-300' : 'bg-[#0E5858] text-white shadow-xl'}`}
                         >

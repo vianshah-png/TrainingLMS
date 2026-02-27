@@ -15,6 +15,7 @@ export default function SummaryGrader({ topicTitle, topicContent, topicCode }: {
     const gradeSummary = async () => {
         if (!summary.trim()) return;
         setLoading(true);
+        logActivity('start_quiz', { topicCode, contentTitle: topicTitle + ' (Summary)' });
         try {
             const response = await fetch("/api/grade-summary", {
                 method: "POST",

@@ -24,7 +24,6 @@ import { supabase } from '@/lib/supabase';
 const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Training Modules', href: '/training', icon: GraduationCap },
-    { name: 'Certification', href: '/certification', icon: Award },
     { name: 'Content Bank', href: '/content-bank', icon: BarChart3 },
     { name: 'Program Info', href: '/program-info', icon: Info },
 ];
@@ -59,8 +58,15 @@ export default function Sidebar({ isCollapsed, setIsCollapsed, userName, userEma
     const searchParams = useSearchParams();
     const initials = getInitials(userName || 'M');
 
-    // Use admin specific items if role is admin
-    const currentNavItems = userRole === 'admin' ? adminNavItems : navItems;
+    // Use admin specific items if role is admin, trainer buddy, or moderator
+    let currentNavItems = (userRole === 'admin' || userRole === 'trainer buddy' || userRole === 'moderator') ? adminNavItems : navItems;
+
+    // Filter out restricted items for trainer buddies
+    if (userRole === 'trainer buddy') {
+        currentNavItems = currentNavItems.filter(item =>
+            !item.href.includes('tab=provisioning') && !item.href.includes('tab=architect')
+        );
+    }
 
     const handleLogout = async () => {
         await supabase.auth.signOut();

@@ -1,6 +1,20 @@
 import { supabase } from "./supabase";
 
-export type ActivityType = 'view_topic' | 'view_content' | 'start_quiz' | 'complete_quiz' | 'submit_assignment' | 'complete_segment' | 'complete_module';
+export type ActivityType =
+    | 'view_topic'
+    | 'view_content'
+    | 'start_quiz'
+    | 'complete_quiz'
+    | 'submit_assignment'
+    | 'start_assignment'
+    | 'complete_segment'
+    | 'complete_module'
+    | 'view_module'
+    | 'click_link'
+    | 'watch_video'
+    | 'start_simulation'
+    | 'click_audit'
+    | 'view_case_study';
 
 export async function logActivity(activityType: ActivityType, details: {
     moduleId?: string;
