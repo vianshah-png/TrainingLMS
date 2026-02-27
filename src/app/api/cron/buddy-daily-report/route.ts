@@ -1,77 +1,77 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { resend, SENDER_EMAIL } from '@/lib/mail';
+import { mailer, SENDER_EMAIL } from '@/lib/mail';
 import { syllabusData } from '@/data/syllabus';
 
 export async function GET(request: Request) {
-    // Security: Check for CRON_SECRET to prevent unauthorized execution
-    const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // Security: Check for CRON_SECRET to prevent unauthorized execution
+  const authHeader = request.headers.get('authorization');
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-    try {
-        // 1. Calculate "Today" in IST (UTC+5:30)
-        const now = new Date();
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istNow = new Date(now.getTime() + istOffset);
-        const todayStart = new Date(istNow);
-        todayStart.setUTCHours(0, 0, 0, 0);
-        const utcStart = new Date(todayStart.getTime() - istOffset).toISOString();
+  try {
+    // 1. Calculate "Today" in IST (UTC+5:30)
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffset);
+    const todayStart = new Date(istNow);
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const utcStart = new Date(todayStart.getTime() - istOffset).toISOString();
 
-        // 2. Fetch Data
-        const [
-            { data: profiles },
-            { data: todayProgress },
-            { data: todayAssessments },
-            { data: dynContent }
-        ] = await Promise.all([
-            supabaseAdmin.from('profiles').select('*').in('role', ['counsellor', 'mentor']),
-            supabaseAdmin.from('mentor_progress').select('*').gte('created_at', utcStart),
-            supabaseAdmin.from('assessment_logs').select('*').gte('created_at', utcStart),
-            supabaseAdmin.from('syllabus_content').select('id, module_id')
-        ]);
+    // 2. Fetch Data
+    const [
+      { data: profiles },
+      { data: todayProgress },
+      { data: todayAssessments },
+      { data: dynContent }
+    ] = await Promise.all([
+      supabaseAdmin.from('profiles').select('*').in('role', ['counsellor', 'mentor']),
+      supabaseAdmin.from('mentor_progress').select('*').gte('created_at', utcStart),
+      supabaseAdmin.from('assessment_logs').select('*').gte('created_at', utcStart),
+      supabaseAdmin.from('syllabus_content').select('id, module_id')
+    ]);
 
-        if (!profiles) return NextResponse.json({ message: 'No profiles found' });
+    if (!profiles) return NextResponse.json({ message: 'No profiles found' });
 
-        const totalStaticTopics = syllabusData
-            .filter(m => m.id !== 'resource-bank')
-            .reduce((acc, m) => acc + m.topics.length, 0);
-        const totalTopics = totalStaticTopics + (dynContent?.length || 0);
+    const totalStaticTopics = syllabusData
+      .filter(m => m.id !== 'resource-bank')
+      .reduce((acc, m) => acc + m.topics.length, 0);
+    const totalTopics = totalStaticTopics + (dynContent?.length || 0);
 
-        const emailPromises: any[] = [];
+    const emailPromises: any[] = [];
 
-        // 3. Process each counselor
-        for (const counselor of profiles) {
-            const counselorProgress = (todayProgress || []).filter(p => p.user_id === counselor.id);
-            const counselorAssessments = (todayAssessments || []).filter(a => a.user_id === counselor.id);
+    // 3. Process each counselor
+    for (const counselor of profiles) {
+      const counselorProgress = (todayProgress || []).filter(p => p.user_id === counselor.id);
+      const counselorAssessments = (todayAssessments || []).filter(a => a.user_id === counselor.id);
 
-            if (counselorProgress.length === 0 && counselorAssessments.length === 0) continue;
+      if (counselorProgress.length === 0 && counselorAssessments.length === 0) continue;
 
-            let buddies = [];
-            try {
-                buddies = typeof counselor.training_buddy === 'string'
-                    ? JSON.parse(counselor.training_buddy)
-                    : counselor.training_buddy;
-            } catch (e) { continue; }
+      let buddies = [];
+      try {
+        buddies = typeof counselor.training_buddy === 'string'
+          ? JSON.parse(counselor.training_buddy)
+          : counselor.training_buddy;
+      } catch (e) { continue; }
 
-            if (!Array.isArray(buddies) || buddies.length === 0) continue;
+      if (!Array.isArray(buddies) || buddies.length === 0) continue;
 
-            // Calculate counselor's stats for today
-            const avgScore = counselorAssessments.length > 0
-                ? Math.round(counselorAssessments.reduce((acc, curr) => acc + curr.score, 0) / counselorAssessments.length)
-                : 0;
+      // Calculate counselor's stats for today
+      const avgScore = counselorAssessments.length > 0
+        ? Math.round(counselorAssessments.reduce((acc, curr) => acc + curr.score, 0) / counselorAssessments.length)
+        : 0;
 
-            // 4. Send email to buddies
-            buddies.forEach((buddy: any) => {
-                if (!buddy.email) return;
+      // 4. Send email to buddies
+      buddies.forEach((buddy: any) => {
+        if (!buddy.email) return;
 
-                emailPromises.push(
-                    resend.emails.send({
-                        from: `BN Academy Reports <${SENDER_EMAIL}>`,
-                        to: buddy.email,
-                        subject: `Daily Progress Report: ${counselor.full_name}`,
-                        html: `
+        emailPromises.push(
+          mailer.sendMail({
+            from: `BN Academy Reports <${SENDER_EMAIL}>`,
+            to: buddy.email,
+            subject: `Daily Progress Report: ${counselor.full_name}`,
+            html: `
               <div style="font-family: sans-serif; padding: 20px; color: #0E5858;">
                 <h2 style="color: #00B6C1;">Daily Training Summary</h2>
                 <p>Hello <strong>${buddy.name || 'Buddy'}</strong>,</p>
@@ -106,21 +106,21 @@ export async function GET(request: Request) {
                 <p style="font-size: 11px; color: #999; text-align: center;">Visit the Admin Portal for detailed logs.</p>
               </div>
             `
-                    })
-                );
-            });
-        }
-
-        await Promise.all(emailPromises);
-
-        return NextResponse.json({
-            success: true,
-            processed: profiles.length,
-            emailsSent: emailPromises.length
-        });
-
-    } catch (err: any) {
-        console.error("Daily Buddy Cron Error:", err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+          })
+        );
+      });
     }
+
+    await Promise.all(emailPromises);
+
+    return NextResponse.json({
+      success: true,
+      processed: profiles.length,
+      emailsSent: emailPromises.length
+    });
+
+  } catch (err: any) {
+    console.error("Daily Buddy Cron Error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
