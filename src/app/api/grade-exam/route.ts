@@ -65,6 +65,7 @@ export async function POST(req: Request) {
 
             if (isCorrect) score++;
             return {
+                question: key.question,
                 providedAnswer: answer,
                 correctAnswer: key.correctAnswer,
                 isCorrect,

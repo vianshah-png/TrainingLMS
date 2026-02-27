@@ -7,14 +7,14 @@ export async function POST(req: Request) {
     try {
         const { summary, topicTitle, topicContent } = await req.json();
 
-        const systemPrompt = `You are a Senior Clinical Auditor at Balance Nutrition. 
+        const systemPrompt = `You are a Senior Academy Auditor at Balance Nutrition. 
         Your task is to review a counsellor's summary of the topic: "${topicTitle}".
         
         Syllabus Reference Content:
         ${topicContent}
         
         Evaluation Guidelines:
-        1. Check if they mentioned key USPs, clinical details, or business protocols from the reference.
+        1. Check if they mentioned key USPs, protocol details, or business protocols from the reference.
         2. Identify gaps: What important information did they miss?
         3. Rate their understanding on a scale of 1-10.
         

@@ -35,10 +35,11 @@ export async function POST(request: Request) {
         }
 
         const results: { dashboard?: boolean; email?: boolean; whatsapp?: string } = {};
+        let notificationId: string | undefined;
 
         // --- Channel: Dashboard (in-app notification) ---
         if (!channel || channel === 'dashboard' || channel === 'all') {
-            const { error } = await supabaseAdmin
+            const { data: newNotif, error } = await supabaseAdmin
                 .from('notifications')
                 .insert([{
                     user_id: userId,
@@ -47,9 +48,12 @@ export async function POST(request: Request) {
                     type: type || 'info',
                     template: template || 'none',
                     interaction_payload: interactionPayload || {}
-                }]);
+                }])
+                .select()
+                .single();
 
             if (error) throw error;
+            notificationId = newNotif?.id;
             results.dashboard = true;
 
             // Log the activity
@@ -77,20 +81,36 @@ export async function POST(request: Request) {
                     const { mailer, SENDER_EMAIL } = await import('@/lib/mail');
 
                     let htmlContent = `
-                        <div style="font-family: sans-serif; padding: 20px; color: #0E5858;">
-                            <div style="background: linear-gradient(135deg, #0E5858, #00B6C1); padding: 30px; border-radius: 16px; margin-bottom: 20px;">
-                                <h2 style="color: white; margin: 0; font-size: 20px;">${title}</h2>
-                                <p style="color: rgba(255,255,255,0.7); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; margin: 8px 0 0 0;">BN Academy Notification</p>
+                        <div style="font-family: Georgia, serif; padding: 40px; color: #0E5858; max-width: 600px; margin: auto; background-color: #FAFCEE;">
+                            <div style="border-bottom: 2px solid #00B6C1; padding-bottom: 20px; margin-bottom: 30px;">
+                                <p style="margin: 0; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.25em; color: #00B6C1;">BN Academy Update</p>
+                                <h2 style="margin: 10px 0 0 0; font-size: 24px; font-weight: normal; color: #0E5858;">${title}</h2>
                             </div>
-                            <p>Hello <strong>${profile.full_name || 'Counsellor'}</strong>,</p>
-                            <div style="background-color: #FAFCEE; padding: 20px; border-radius: 12px; border: 1px solid #00B6C120; margin: 20px 0;">
-                                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #333;">${message.replace(/\n/g, '<br/>')}</p>
+                            
+                            <div style="background: white; padding: 30px; border-radius: 24px; border: 1px solid rgba(14,88,88,0.1); box-shadow: 0 10px 30px rgba(14,88,88,0.05); margin-bottom: 30px;">
+                                <p style="font-size: 15px; line-height: 1.8; color: #333; margin: 0;">
+                                    Hello <strong>${profile.full_name || 'Counsellor'}</strong>,<br/><br/>
+                                    ${message.replace(/\n/g, '<br/>')}
+                                </p>
+
+                                ${template === 'feedback' ? `
+                                <div style="margin-top: 28px; background: #f8fffe; border: 2px dashed #00B6C1; border-radius: 16px; padding: 24px;">
+                                    <p style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: #00B6C1; margin: 0 0 12px 0;">📩 We'd love your feedback</p>
+                                    <p style="font-size: 14px; color: #0E5858; line-height: 1.7; margin: 0 0 14px 0;">
+                                      To share your thoughts, simply <strong>reply to this email</strong> with:
+                                    </p>
+                                    <ol style="font-size: 13px; color: #555; line-height: 1.9; padding-left: 20px; margin: 0 0 12px 0;">
+                                      <li>A <strong>rating from 1 to 5</strong> (e.g. "Rating: 4")</li>
+                                      <li>Any <strong>additional comments or suggestions</strong> you'd like to share</li>
+                                    </ol>
+                                    <p style="font-size: 12px; color: #aaa; margin: 0; font-style: italic;">Example reply: "Rating: 4 — Great content, but could use more practical examples."</p>
+                                </div>
+                                ` : ''}
                             </div>
                     `;
 
                     // SPECIAL LOGIC: Aggregated Report for Trainer Buddies
                     if (template === 'buddy_report') {
-                        // 1. Fetch all counsellors assigned to this buddy
                         const { data: allProfiles } = await supabaseAdmin.from('profiles').select('*');
                         const myCounsellors = (allProfiles || []).filter(p => {
                             try {
@@ -103,13 +123,7 @@ export async function POST(request: Request) {
 
                         if (myCounsellors.length > 0) {
                             const counselorIds = myCounsellors.map(c => c.id);
-
-                            // 2. Fetch data for these counsellors
-                            const [
-                                { data: assessments },
-                                { data: activityLogs },
-                                { data: progress }
-                            ] = await Promise.all([
+                            const [assessments, activityLogs, progress] = await Promise.all([
                                 supabaseAdmin.from('assessment_logs').select('*').in('user_id', counselorIds).order('created_at', { ascending: false }),
                                 supabaseAdmin.from('mentor_activity_logs').select('*').in('user_id', counselorIds).order('created_at', { ascending: false }),
                                 supabaseAdmin.from('mentor_progress').select('*').in('user_id', counselorIds).order('completed_at', { ascending: false })
@@ -119,9 +133,9 @@ export async function POST(request: Request) {
                                 <div style="margin-top: 30px;">
                                     <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; color: #0E5858; border-bottom: 2px solid #00B6C1; padding-bottom: 10px; margin-bottom: 20px;">Counsellor Performance Overview</h3>
                                     ${myCounsellors.map(c => {
-                                const cAssessments = (assessments || []).filter(a => a.user_id === c.id).slice(0, 3);
-                                const cActivity = (activityLogs || []).filter(a => a.user_id === c.id).slice(0, 3);
-                                const cProgressCount = (progress || []).filter(p => p.user_id === c.id).length;
+                                const cAssessments = (assessments.data || []).filter(a => a.user_id === c.id).slice(0, 3);
+                                const cActivity = (activityLogs.data || []).filter(a => a.user_id === c.id).slice(0, 3);
+                                const cProgressCount = (progress.data || []).filter(p => p.user_id === c.id).length;
 
                                 return `
                                             <div style="background: white; border-radius: 12px; border: 1px solid #0E585810; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
@@ -159,19 +173,15 @@ export async function POST(request: Request) {
 
                     // SPECIAL LOGIC: Direct Report of a single user SHARE TO BUDDY
                     if (template === 'direct_report') {
-                        const [
-                            { data: assessments },
-                            { data: activityLogs },
-                            { data: progress }
-                        ] = await Promise.all([
+                        const [assessments, activityLogs, progress] = await Promise.all([
                             supabaseAdmin.from('assessment_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
                             supabaseAdmin.from('mentor_activity_logs').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
                             supabaseAdmin.from('mentor_progress').select('*').eq('user_id', userId).order('completed_at', { ascending: false })
                         ]);
 
-                        const cAssessments = (assessments || []).slice(0, 5);
-                        const cActivity = (activityLogs || []).slice(0, 10);
-                        const cProgressCount = (progress || []).length;
+                        const cAssessments = (assessments.data || []).slice(0, 5);
+                        const cActivity = (activityLogs.data || []).slice(0, 10);
+                        const cProgressCount = (progress.data || []).length;
 
                         htmlContent += `
                             <div style="margin-top: 30px;">
@@ -206,8 +216,10 @@ export async function POST(request: Request) {
                     }
 
                     htmlContent += `
-                            <hr style="border: 0; border-top: 1px solid #0E585810; margin: 30px 0;" />
-                            <p style="font-size: 11px; color: #999; text-align: center;">This is an official notification from BN Academy.</p>
+                            <div style="text-align: center; border-top: 1px solid rgba(14,88,88,0.05); padding-top: 30px; margin-top: 30px;">
+                                <p style="font-size: 11px; color: #999; margin: 0;">This is an official academy notification from Balance Nutrition.</p>
+                                <p style="font-size: 10px; color: #00B6C1; margin-top: 10px; font-weight: bold;">Counsellor Mastery Portal</p>
+                            </div>
                         </div>
                     `;
 
@@ -230,6 +242,7 @@ export async function POST(request: Request) {
                     await mailer.sendMail({
                         from: `BN Academy <${SENDER_EMAIL}>`,
                         to: recipients,
+                        cc: ['workwithus@balancenutrition.in'],
                         subject: title,
                         html: htmlContent
                     });

@@ -153,8 +153,8 @@ function ContentBankContent() {
                         <FolderOpen size={16} />
                         <span>Asset Central</span>
                     </div>
-                    <h1 className="text-4xl lg:text-5xl font-serif text-[#0E5858] mb-2 tracking-tight">Clinical Content Bank</h1>
-                    <p className="text-gray-500 font-medium tracking-tight">Refined clinical protocols, program walkthroughs, and sales mastery sessions.</p>
+                    <h1 className="text-4xl lg:text-5xl font-serif text-[#0E5858] mb-2 tracking-tight">Nutrition Academy Bank</h1>
+                    <p className="text-gray-500 font-medium tracking-tight">Refined nutrition protocols, program walkthroughs, and sales mastery sessions.</p>
                 </div>
 
                 <div className="group relative w-full md:w-96">
@@ -266,7 +266,7 @@ function ContentBankContent() {
                                         <div className="flex items-center gap-2 text-[10px] text-gray-400 font-black uppercase tracking-[0.1em]">
                                             <span>{resource.code}</span>
                                             <span className="w-1 h-1 rounded-full bg-gray-200"></span>
-                                            <span className="text-[#00B6C1]/60">Clinical Protocol</span>
+                                            <span className="text-[#00B6C1]/60">Nutrition Protocol</span>
                                         </div>
                                         <p className="mt-3 text-xs text-gray-400 leading-relaxed line-clamp-2 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-500">
                                             {resource.content}
@@ -283,7 +283,7 @@ function ContentBankContent() {
                         <FolderOpen size={32} />
                     </div>
                     <h2 className="text-2xl font-serif text-[#0E5858] mb-2 tracking-tight">Vault Population in Progress</h2>
-                    <p className="text-gray-400 max-w-sm">We are currently migrating refined clinical manuals and video protocols to the Asset Central.</p>
+                    <p className="text-gray-400 max-w-sm">We are currently migrating refined academy manuals and video protocols to the Asset Central.</p>
                 </div>
             )}
         </motion.main>

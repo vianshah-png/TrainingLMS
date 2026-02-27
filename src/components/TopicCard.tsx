@@ -34,7 +34,7 @@ import {
     MessageCircle
 } from "lucide-react";
 import YouTubePlayer from "./YouTubePlayer";
-import ClinicalSimulator from "./ClinicalSimulator";
+import AcademySimulator from "./AcademySimulator";
 import AIAssessment from "./AIAssessment";
 import SummaryGrader from "./SummaryGrader";
 import AssignmentForm from "./AssignmentForm";
@@ -63,12 +63,9 @@ function getEmbedUrl(url: string | undefined): string | null {
         return `https://www.youtube.com/embed/${ytMatch[2]}`;
     }
 
-    // Google Drive
+    // Google Drive - Disable embedding as it often violates CSP
     if (url.includes('drive.google.com')) {
-        const driveMatch = url.match(/\/file\/d\/([^\/]+)/);
-        if (driveMatch) {
-            return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
-        }
+        return null;
     }
 
     // Zoom
@@ -79,20 +76,7 @@ function getEmbedUrl(url: string | undefined): string | null {
     return null;
 }
 
-function getDocEmbedUrl(url: string): string {
-    if (url.includes('docs.google.com/presentation')) {
-        // Use /embed for better iframe rendering in slideshow mode
-        const idMatch = url.match(/\/d\/([^\/]+)/);
-        if (idMatch) {
-            return `https://docs.google.com/presentation/d/${idMatch[1]}/embed?start=false&loop=false&delayms=3000`;
-        }
-        return url.replace(/\/(edit|preview|present).*$/, '/embed');
-    }
-    if (url.includes('docs.google.com')) {
-        return url.replace(/\/(edit|view|present).*$/, '/preview');
-    }
-    return url;
-}
+
 
 export default function TopicCard({ topic, index, isCompleted, onToggleComplete, onMoveNext, isLastTopic, userId, isEditMode, onEdit }: TopicCardProps) {
     const [videoCompleted, setVideoCompleted] = useState(false);
@@ -101,6 +85,30 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
     const [showHealthPopup, setShowHealthPopup] = useState(false);
     const [selectedCaseStudy, setSelectedCaseStudy] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [emailStatus, setEmailStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+
+    const sendMockCallEmail = async (mentorName: string, mentorEmail: string) => {
+        const key = mentorEmail;
+        setEmailStatus(prev => ({ ...prev, [key]: 'sending' }));
+        try {
+            const res = await fetch('/api/send-mock-call-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mentorName,
+                    mentorEmail,
+                    counselorEmail: undefined, // server uses session if needed
+                    counselorName: undefined,
+                }),
+            });
+            if (!res.ok) throw new Error('Failed');
+            setEmailStatus(prev => ({ ...prev, [key]: 'sent' }));
+            setTimeout(() => setEmailStatus(prev => ({ ...prev, [key]: 'idle' })), 4000);
+        } catch {
+            setEmailStatus(prev => ({ ...prev, [key]: 'error' }));
+            setTimeout(() => setEmailStatus(prev => ({ ...prev, [key]: 'idle' })), 3000);
+        }
+    };
 
     // Find main video/media link
     const mediaLink = topic.links?.find(l =>
@@ -533,12 +541,21 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             </div>
 
                                             <div className="flex flex-col gap-3 mt-auto">
-                                                <a
-                                                    href={`mailto:mentor.epshita@balancenutrition.in?cc=workwithus@balancenutrition.in&subject=Request%20for%20Mock%20Call&body=Hi%20Mentor%20Epshita,%0D%0A%0D%0AI%20would%20like%20to%20schedule%20my%20mock%20call.`}
-                                                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white rounded-xl text-sm font-bold transition-colors"
+                                                <button
+                                                    onClick={() => sendMockCallEmail('Mentor Epshita', 'mentor.epshita@balancenutrition.in')}
+                                                    disabled={emailStatus['mentor.epshita@balancenutrition.in'] === 'sending' || emailStatus['mentor.epshita@balancenutrition.in'] === 'sent'}
+                                                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${emailStatus['mentor.epshita@balancenutrition.in'] === 'sent'
+                                                        ? 'bg-green-500 text-white'
+                                                        : emailStatus['mentor.epshita@balancenutrition.in'] === 'error'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : emailStatus['mentor.epshita@balancenutrition.in'] === 'sending'
+                                                                ? 'bg-[#0E5858]/60 text-white cursor-wait'
+                                                                : 'bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white'
+                                                        }`}
                                                 >
-                                                    <Mail size={16} /> Email Epshita
-                                                </a>
+                                                    <Mail size={16} />
+                                                    {emailStatus['mentor.epshita@balancenutrition.in'] === 'sending' ? 'Sending...' : emailStatus['mentor.epshita@balancenutrition.in'] === 'sent' ? '✓ Email Sent!' : emailStatus['mentor.epshita@balancenutrition.in'] === 'error' ? 'Failed — Retry' : 'Email Epshita'}
+                                                </button>
                                                 <a
                                                     href="https://wa.me/917021963284?text=Hi%20Mentor%20Epshita,%20I%20would%20like%20to%20schedule%20my%20mock%20call."
                                                     target="_blank"
@@ -565,12 +582,21 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             </div>
 
                                             <div className="flex flex-col gap-3 mt-auto">
-                                                <a
-                                                    href={`mailto:mentor.omanshi@balancenutrition.in?cc=workwithus@balancenutrition.in&subject=Request%20for%20Mock%20Call&body=Hi%20Mentor%20Omanshi,%0D%0A%0D%0AI%20would%20like%20to%20schedule%20my%20mock%20call.`}
-                                                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white rounded-xl text-sm font-bold transition-colors"
+                                                <button
+                                                    onClick={() => sendMockCallEmail('Mentor Omanshi', 'mentor.omanshi@balancenutrition.in')}
+                                                    disabled={emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending' || emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent'}
+                                                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent'
+                                                        ? 'bg-green-500 text-white'
+                                                        : emailStatus['mentor.omanshi@balancenutrition.in'] === 'error'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending'
+                                                                ? 'bg-[#0E5858]/60 text-white cursor-wait'
+                                                                : 'bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white'
+                                                        }`}
                                                 >
-                                                    <Mail size={16} /> Email Omanshi
-                                                </a>
+                                                    <Mail size={16} />
+                                                    {emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending' ? 'Sending...' : emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent' ? '✓ Email Sent!' : emailStatus['mentor.omanshi@balancenutrition.in'] === 'error' ? 'Failed — Retry' : 'Email Omanshi'}
+                                                </button>
                                                 <a
                                                     href="https://wa.me/919820017056?text=Hi%20Mentor%20Omanshi,%20I%20would%20like%20to%20schedule%20my%20mock%20call."
                                                     target="_blank"
@@ -682,7 +708,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 <div className="p-8 bg-gradient-to-br from-white to-[#FAFCEE]/30 rounded-[3rem] border border-[#0E5858]/5 shadow-2xl relative overflow-hidden">
                                     {topic.hasLive ? (
                                         <>
-                                            <ClinicalSimulator topicTitle={topic.title} topicContent={topic.content} topicCode={topic.code} />
+                                            <AcademySimulator topicTitle={topic.title} topicContent={topic.content} topicCode={topic.code} />
                                             {/* Intermediate confirmation removed */}
                                         </>
                                     ) : (

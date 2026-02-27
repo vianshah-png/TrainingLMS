@@ -34,7 +34,7 @@ import { useState, useEffect } from "react";
 import TopicCard from "@/components/TopicCard";
 import { supabase } from "@/lib/supabase";
 import AIAssessment from "@/components/AIAssessment";
-import ClinicalSimulator from "@/components/ClinicalSimulator";
+import AcademySimulator from "@/components/AcademySimulator";
 import { AnimatePresence } from "framer-motion";
 import { logActivity } from "@/lib/activity";
 
@@ -594,7 +594,7 @@ export default function ModulePage() {
                                 <p className="text-gray-500 font-medium">Practice your consultation pitch with our AI client before the final module check.</p>
                             </div>
 
-                            <ClinicalSimulator
+                            <AcademySimulator
                                 topicTitle="Consultation Protocol Mastery"
                                 topicContent="Deep dive into program pitching, client engagement, and medical history discovery."
                                 topicCode={`SIM_${moduleId}`}
@@ -1029,7 +1029,7 @@ export default function ModulePage() {
                                 <p className={`text-lg font-medium max-w-xl ${assessmentPassed ? 'text-gray-500' : 'text-white/60 text-base'}`}>
                                     {assessmentPassed
                                         ? "Great job! You've successfully covered all sections and verified your proficiency. You're now ready for the next level."
-                                        : "Great job on completing the sections! Demonstrate your clinical mastery by taking the final module quiz."
+                                        : "Great job on completing the sections! Demonstrate your subject mastery by taking the final module quiz."
                                     }
                                 </p>
                             </div>

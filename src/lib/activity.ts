@@ -33,7 +33,6 @@ export async function logActivity(activityType: ActivityType, details: {
             module_id: details.moduleId,
             topic_code: details.topicCode,
             content_title: details.contentTitle,
-            score: details.score
         };
 
         const { error } = await supabase

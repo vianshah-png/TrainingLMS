@@ -106,9 +106,9 @@ const TOTAL_SYLLABUS_TOPICS = syllabusData
     .reduce((acc, mod) => acc + mod.topics.length, 0);
 
 const NOTIFICATION_TEMPLATES = [
-    { id: 'inactive', label: 'Inactive', title: 'Account Status: Inactive', message: 'Your account has been flagged as inactive due to low engagement. Please resume your clinical training modules to remain eligible for upcoming certifications.', type: 'info' },
-    { id: 'feedback', label: 'Feedback Request', title: 'Clinical Training Feedback', message: 'We value your experience! Please provide a star rating and a brief note about the clarity and utility of your recent modules.', type: 'alert', template: 'feedback' },
-    { id: 'retake', label: 'Retake Test', title: 'Performance Review: Retake Required', message: 'Your recent assessment score was below the mastery threshold. Please revisit the clinical module and retake the test once you are ready.', type: 'alert' },
+    { id: 'inactive', label: 'Inactive', title: 'Account Status: Inactive', message: 'Your account has been flagged as inactive due to low engagement. Please resume your training modules to remain eligible for upcoming certifications.', type: 'info' },
+    { id: 'feedback', label: 'Feedback Request', title: 'Training Feedback', message: 'We value your experience! Please provide a star rating and a brief note about the clarity and utility of your recent modules.', type: 'alert', template: 'feedback' },
+    { id: 'retake', label: 'Retake Test', title: 'Performance Review: Retake Required', message: 'Your recent assessment score was below the mastery threshold. Please revisit the module and retake the test once you are ready.', type: 'alert' },
     { id: 'buddy_report', label: 'Trainer Buddy Summary Email', title: 'Weekly Mentorship Report', message: 'This report contains an automated summary of all your assigned counsellors, including their current activity, training progress, and latest quiz scores.', type: 'info', template: 'buddy_report' },
 ];
 
@@ -2241,7 +2241,7 @@ function AdminDashboardContent() {
                                     <div>
                                         <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-2">Protocol Architecture</p>
                                         <h3 className="text-3xl font-serif text-[#0E5858]">Quiz Protocol Editor</h3>
-                                        <p className="text-xs text-gray-400 font-medium mt-1">Override AI-generated assessments with manual clinical questions.</p>
+                                        <p className="text-xs text-gray-400 font-medium mt-1">Override AI-generated assessments with manual academy questions.</p>
                                     </div>
                                     <div className="flex flex-col gap-2 w-full md:w-auto">
                                         <select
@@ -2303,7 +2303,7 @@ function AdminDashboardContent() {
                                                     </button>
                                                     <div className="grid grid-cols-1 gap-6">
                                                         <div className="space-y-2">
-                                                            <label className="text-[9px] font-black text-[#00B6C1] uppercase tracking-widest ml-4">Clinical Question {qIdx + 1}</label>
+                                                            <label className="text-[9px] font-black text-[#00B6C1] uppercase tracking-widest ml-4">Academy Question {qIdx + 1}</label>
                                                             <textarea
                                                                 value={q.question}
                                                                 onChange={e => {
@@ -2399,7 +2399,7 @@ function AdminDashboardContent() {
                                                 onClick={() => setManualQuizQuestions(prev => [...prev, { type: 'mcq', question: "", options: ["", "", "", ""], correctAnswer: "", justification: "" }])}
                                                 className="w-full py-6 border-2 border-dashed border-gray-100 rounded-[2.5rem] text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] hover:border-[#00B6C1] hover:text-[#00B6C1] transition-all bg-gray-50/30 flex items-center justify-center gap-3"
                                             >
-                                                <Plus size={18} /> Add Clinical Assessment Question
+                                                <Plus size={18} /> Add Academy Assessment Question
                                             </button>
                                         </div>
 
@@ -2956,7 +2956,7 @@ function AdminDashboardContent() {
                                         value={emailForm.message}
                                         onChange={e => setEmailForm({ ...emailForm, message: e.target.value })}
                                         className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 text-sm font-medium outline-none h-40 resize-none focus:ring-2 focus:ring-[#00B6C1]/10"
-                                        placeholder="Type your clinical update or feedback..."
+                                        placeholder="Type your academy update or feedback..."
                                     />
                                 </div>
 

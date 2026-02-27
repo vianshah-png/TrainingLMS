@@ -315,7 +315,7 @@ export default function Home() {
               Welcome back, <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0E5858] to-[#00B6C1]">{userName}</span>
             </h1>
-            <p className="text-gray-400 font-medium max-w-md italic">Maintain clinical precision and document your progress.</p>
+            <p className="text-gray-400 font-medium max-w-md italic">Maintain academy precision and document your progress.</p>
           </motion.div>
 
           <div className="flex items-center gap-4">

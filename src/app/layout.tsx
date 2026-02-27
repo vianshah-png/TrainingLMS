@@ -2,6 +2,7 @@
 
 import { Playfair_Display, Outfit } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
+import NotificationItem from "@/components/NotificationItem";
 import "./globals.css";
 import { useState, useEffect, useRef } from "react";
 import { Bell, LogOut, Loader2, Inbox } from "lucide-react";
@@ -85,18 +86,26 @@ export default function RootLayout({
         setNotifications(notifs || []);
 
         if (isLoginPage) {
+          const searchParams = window.location.search;
           if (finalRole === 'admin' || finalRole === 'trainer buddy' || finalRole === 'moderator') {
-            router.push("/admin");
+            router.push(`/admin${searchParams}`);
           } else {
-            router.push("/");
+            router.push(`/${searchParams}`);
           }
         } else if (pathname.startsWith('/admin') && finalRole !== 'admin' && finalRole !== 'trainer buddy' && finalRole !== 'moderator') {
-          router.push("/");
+          router.push(`/${window.location.search}`);
         }
       } else if (!isLoginPage) {
-        router.push("/login");
+        router.push(`/login${window.location.search}`);
       }
       setIsAuthChecked(true);
+
+      // Handle deep link opening of notifications
+      const params = new URLSearchParams(window.location.search);
+      const openNotif = params.get('openNotif') || params.get('openNotification');
+      if (openNotif) {
+        setShowNotifications(true);
+      }
     };
 
     checkUser();
@@ -254,26 +263,11 @@ export default function RootLayout({
                       <div className="max-h-[400px] overflow-y-auto">
                         {notifications.length > 0 ? (
                           notifications.map(notify => (
-                            <div
+                            <NotificationItem
                               key={notify.id}
-                              onClick={() => !notify.is_read && markNotificationRead(notify.id)}
-                              className={`px-5 py-4 border-b border-gray-50 transition-all cursor-pointer hover:bg-gray-50/50 ${!notify.is_read
-                                ? `border-l-4 ${notify.type === 'alert' ? 'border-l-red-500 bg-red-50/20' :
-                                  notify.type === 'warning' ? 'border-l-orange-400 bg-orange-50/20' :
-                                    'border-l-[#00B6C1] bg-[#00B6C1]/5'
-                                }`
-                                : ''
-                                }`}
-                            >
-                              <div className="flex justify-between items-start mb-1">
-                                <h5 className="text-[11px] font-bold text-[#0E5858] leading-tight pr-2">{notify.title}</h5>
-                                <p className="text-[7px] font-black text-gray-300 uppercase shrink-0">
-                                  {new Date(notify.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                                </p>
-                              </div>
-                              <p className="text-[10px] text-gray-500 leading-relaxed font-medium">{notify.message}</p>
-                              {!notify.is_read && <div className="mt-2 w-1.5 h-1.5 rounded-full bg-[#00B6C1]"></div>}
-                            </div>
+                              notify={notify}
+                              onRead={markNotificationRead}
+                            />
                           ))
                         ) : (
                           <div className="py-16 text-center">

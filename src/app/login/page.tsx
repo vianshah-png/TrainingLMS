@@ -142,7 +142,7 @@ export default function LoginPage() {
                     <h1 className="text-4xl font-serif text-[#0E5858] mb-2 tracking-tight">Balance Nutrition LMS</h1>
                     <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-[0.4em] flex items-center gap-2">
                         <Sparkles size={12} className="animate-pulse" />
-                        clinical mastery portal
+                        counsellor mastery portal
                     </p>
                 </div>
 
@@ -165,7 +165,7 @@ export default function LoginPage() {
                                 </div>
                                 <h2 className="text-2xl font-serif text-[#0E5858] mb-3">LMS For Counsellors</h2>
                                 <p className="text-sm text-gray-500 font-medium mb-8 leading-relaxed">
-                                    Specialized training environment for new interviewees and upcoming clinical counsellors.
+                                    Specialized training environment for new interviewees and upcoming counsellors.
                                 </p>
                                 <button className="flex items-center gap-2 text-[#00B6C1] text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-all">
                                     Enter Pathway <ChevronRight size={16} />
