@@ -76,6 +76,21 @@ function getEmbedUrl(url: string | undefined): string | null {
     return null;
 }
 
+function getDocEmbedUrl(url: string | null): string {
+    if (!url) return '';
+    if (url.includes('docs.google.com/presentation')) {
+        const idMatch = url.match(/\/d\/([^\/]+)/);
+        if (idMatch) {
+            return `https://docs.google.com/presentation/d/${idMatch[1]}/embed?start=false&loop=false&delayms=3000`;
+        }
+        return url.replace(/\/(edit|preview|present).*$/, '/embed');
+    }
+    if (url.includes('docs.google.com') || url.includes('drive.google.com')) {
+        return url.replace(/\/(edit|view|present|view\?usp=sharing).*$/, '/preview');
+    }
+    return url;
+}
+
 
 
 export default function TopicCard({ topic, index, isCompleted, onToggleComplete, onMoveNext, isLastTopic, userId, isEditMode, onEdit }: TopicCardProps) {
