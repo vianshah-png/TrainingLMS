@@ -27,42 +27,50 @@ export default function NutripreneurDashboard() {
     useEffect(() => {
         isMounted.current = true;
         const init = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { router.push('/nutripreneur/login'); return; }
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !session) { 
+                    router.push('/nutripreneur/login'); 
+                    return; 
+                }
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role, full_name')
-                .eq('id', session.user.id)
-                .single();
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('role, full_name')
+                    .eq('id', session.user.id)
+                    .single();
 
-            if (profile?.role !== 'nutripreneur') {
-                router.push('/login');
-                return;
+                if (profileError || profile?.role !== 'nutripreneur') {
+                    router.push('/login');
+                    return;
+                }
+
+                if (!isMounted.current) return;
+                setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
+
+                // Fetch progress
+                const { data: progressData } = await supabase
+                    .from('mentor_activity_logs')
+                    .select('id, created_at')
+                    .eq('user_id', session.user.id)
+                    .order('created_at', { ascending: false });
+
+                if (!isMounted.current) return;
+                const total = progressData?.length || 0;
+                const earned = Math.min(Math.round((total / 20) * 100), 100);
+                setProgress(earned);
+                setXp(total * 50);
+
+                // Streak: count consecutive days with activity
+                const days = new Set((progressData || []).map(l =>
+                    new Date(l.created_at).toDateString()
+                ));
+                setStreak(days.size);
+            } catch (e) {
+                console.error("Dashboard Init Error", e);
+            } finally {
+                if (isMounted.current) setLoading(false);
             }
-
-            if (!isMounted.current) return;
-            setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
-
-            // Fetch progress
-            const { data: progressData } = await supabase
-                .from('mentor_activity_logs')
-                .select('id, created_at')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false });
-
-            if (!isMounted.current) return;
-            const total = progressData?.length || 0;
-            const earned = Math.min(Math.round((total / 20) * 100), 100);
-            setProgress(earned);
-            setXp(total * 50);
-
-            // Streak: count consecutive days with activity
-            const days = new Set((progressData || []).map(l =>
-                new Date(l.created_at).toDateString()
-            ));
-            setStreak(days.size);
-            setLoading(false);
         };
         init();
         return () => { isMounted.current = false; };

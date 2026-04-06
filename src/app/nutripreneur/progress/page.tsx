@@ -101,40 +101,49 @@ export default function NutripreneurProgress() {
 
     useEffect(() => {
         const init = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { router.push('/nutripreneur/login'); return; }
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !session) { 
+                    router.push('/nutripreneur/login'); 
+                    return; 
+                }
 
-            setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
+                setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
 
-            const { data: logs } = await supabase
-                .from('mentor_activity_logs')
-                .select('id, created_at')
-                .eq('user_id', session.user.id)
-                .order('created_at', { ascending: false });
+                const { data: logs, error: logsError } = await supabase
+                    .from('mentor_activity_logs')
+                    .select('id, created_at')
+                    .eq('user_id', session.user.id)
+                    .order('created_at', { ascending: false });
 
-            const total = logs?.length || 0;
-            const earnedXp = total * 50;
-            setXp(earnedXp);
+                if (logsError) throw logsError;
 
-            // Determine level
-            const currentLevel = LEVELS.findLast(l => earnedXp >= l.minXp) || LEVELS[0];
-            setLevel(currentLevel);
+                const total = logs?.length || 0;
+                const earnedXp = total * 50;
+                setXp(earnedXp);
 
-            const range = currentLevel.maxXp - currentLevel.minXp;
-            const withinLevel = earnedXp - currentLevel.minXp;
-            setLevelProgress(Math.min(Math.round((withinLevel / range) * 100), 100));
+                // Determine level
+                const currentLevel = LEVELS.findLast(l => earnedXp >= l.minXp) || LEVELS[0];
+                setLevel(currentLevel);
 
-            // Active days
-            const days = new Set((logs || []).map(l => new Date(l.created_at).toDateString()));
-            setActiveDays(days);
-            setStreak(days.size);
+                const range = currentLevel.maxXp - currentLevel.minXp;
+                const withinLevel = earnedXp - currentLevel.minXp;
+                setLevelProgress(Math.min(Math.round((withinLevel / range) * 100), 100));
 
-            setLoading(false);
+                // Active days
+                const days = new Set((logs || []).map(l => new Date(l.created_at).toDateString()));
+                setActiveDays(days);
+                setStreak(days.size);
 
-            // Confetti on first visit if good progress
-            if (earnedXp > 100) {
-                setTimeout(() => setShowConfetti(true), 800);
-                setTimeout(() => setShowConfetti(false), 3000);
+                // Confetti on first visit if good progress
+                if (earnedXp > 100) {
+                    setTimeout(() => setShowConfetti(true), 800);
+                    setTimeout(() => setShowConfetti(false), 3000);
+                }
+            } catch (e) {
+                console.error("Progress Init Error:", e);
+            } finally {
+                setLoading(false);
             }
         };
         init();
