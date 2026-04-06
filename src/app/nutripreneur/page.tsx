@@ -34,26 +34,22 @@ export default function NutripreneurDashboard() {
                     return; 
                 }
 
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('role, full_name')
-                    .eq('id', session.user.id)
-                    .single();
+                if (!isMounted.current) return;
+                setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
 
-                if (profileError || profile?.role !== 'nutripreneur') {
+                // Execute heavy DB queries in parallel to drastically cut loading times
+                const [profileRes, progressRes] = await Promise.all([
+                    supabase.from('profiles').select('role, full_name').eq('id', session.user.id).single(),
+                    supabase.from('mentor_activity_logs').select('id, created_at').eq('user_id', session.user.id).order('created_at', { ascending: false })
+                ]);
+
+                if (profileRes.error || profileRes.data?.role !== 'nutripreneur') {
                     router.push('/login');
                     return;
                 }
 
                 if (!isMounted.current) return;
-                setUserName(session.user.user_metadata?.full_name?.split(' ')[0] || "Nutripreneur");
-
-                // Fetch progress
-                const { data: progressData } = await supabase
-                    .from('mentor_activity_logs')
-                    .select('id, created_at')
-                    .eq('user_id', session.user.id)
-                    .order('created_at', { ascending: false });
+                const progressData = progressRes.data;
 
                 if (!isMounted.current) return;
                 const total = progressData?.length || 0;
