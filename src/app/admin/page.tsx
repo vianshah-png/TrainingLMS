@@ -138,6 +138,7 @@ function AdminDashboardContent() {
         password: "",
         fullName: "",
         role: "counsellor",
+        phone: "",
         buddyName: "BN Admin",
         buddyEmail: "admin@balancenutrition.in",
         buddyPhone: "0000000000"
@@ -273,9 +274,9 @@ function AdminDashboardContent() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Provisioning failed');
 
-            setUserSuccess(`Authorized: ${newUser.email}. Account created.`);
+            setUserSuccess(data.message || `Authorized: ${newUser.email}. Account created.`);
             setNewUser({
-                email: "", password: "", fullName: "", role: "counsellor",
+                email: "", password: "", fullName: "", role: "counsellor", phone: "",
                 buddyName: "BN Admin", buddyEmail: "admin@balancenutrition.in", buddyPhone: "0000000000"
             });
             refreshData();
@@ -1037,6 +1038,29 @@ function AdminDashboardContent() {
                                         placeholder="email@balancenutrition.in"
                                         className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
                                         required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Account Role</label>
+                                    <select
+                                        value={newUser.role}
+                                        onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none appearance-none cursor-pointer"
+                                    >
+                                        <option value="counsellor">Counsellor</option>
+                                        <option value="nutripreneur">Nutripreneur</option>
+                                        <option value="moderator">Moderator</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Personal Phone</label>
+                                    <input
+                                        type="text"
+                                        value={newUser.phone}
+                                        onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                                        placeholder="+91 00000 00000"
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
                                     />
                                 </div>
                                 <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">

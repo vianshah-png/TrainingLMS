@@ -110,6 +110,9 @@ export default function RootLayout({
     router.push("/login");
   };
 
+  const isNutripreneurPage = pathname.startsWith("/nutripreneur");
+  const isNutripreneur = userRole === "nutripreneur";
+
   // Show nothing until auth is checked to prevent flickering
   if (!isAuthChecked) {
     return (
@@ -145,16 +148,18 @@ export default function RootLayout({
       </head>
       <body className={`${playfair.variable} ${outfit.variable} font-sans text-[#0E5858] bg-[#FAFCEE] antialiased overflow-x-hidden`}>
         <div className="flex min-h-screen">
-          <Sidebar
-            isCollapsed={isCollapsed}
-            setIsCollapsed={setIsCollapsed}
-            userName={userName}
-            userEmail={userEmail}
-            userRole={userRole}
-          />
+          {!isNutripreneurPage && (
+            <Sidebar
+              isCollapsed={isCollapsed}
+              setIsCollapsed={setIsCollapsed}
+              userName={userName}
+              userEmail={userEmail}
+              userRole={userRole}
+            />
+          )}
 
           <div
-            className={`flex-1 transition-all duration-500 ease-in-out ${isCollapsed ? 'ml-[88px]' : 'ml-[280px]'
+            className={`flex-1 transition-all duration-500 ease-in-out ${(isNutripreneurPage || isNutripreneur) ? 'ml-0' : (isCollapsed ? 'ml-[88px]' : 'ml-[280px]')
               } relative overflow-hidden`}
           >
             {/* Top Bar */}

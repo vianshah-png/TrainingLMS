@@ -47,12 +47,15 @@ export async function POST(req: Request) {
         // Clean up markdown if present (e.g. ```json ... ```)
         const jsonContent = responseContent.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        let testData: any[];
+        let testData: any[] = [];
         try {
             testData = JSON.parse(jsonContent);
         } catch (e) {
             console.error("JSON Parse Error:", e);
-            testData = [];
+        }
+
+        if (!Array.isArray(testData) || testData.length === 0) {
+            throw new Error("AI failed to generate a valid test structure.");
         }
 
         // Secure correct answers AND justifications before sending to client

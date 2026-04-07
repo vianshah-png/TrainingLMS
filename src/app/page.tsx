@@ -53,29 +53,37 @@ export default function Home() {
       setUserName(session.user.user_metadata?.full_name || "Counsellor");
 
       // 0. Fetch Profile for Training Buddy
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('training_buddy')
         .eq('id', session.user.id)
         .single();
+
+      if (profileError) {
+        console.warn("Profile fetch error. Might be first-time user or RLS restriction:", profileError.message);
+      }
 
       if (profile?.training_buddy) {
         setTrainingBuddy(profile.training_buddy);
       }
 
       // 1. Fetch Dynamic Content Metadata (to count total topics)
-      const { data: dynContent } = await supabase
+      const { data: dynContent, error: dynError } = await supabase
         .from('syllabus_content')
         .select('id, module_id');
+
+      if (dynError) console.error("Dynamic content fetch failed:", dynError.message);
 
       const dynamicCount = dynContent?.length || 0;
       setDynamicContent(dynContent || []);
 
       // 2. Fetch Assessment Scores
-      const { data: assessments } = await supabase
+      const { data: assessments, error: assError } = await supabase
         .from('assessment_logs')
         .select('*')
         .eq('user_id', session.user.id);
+
+      if (assError) console.error("Assessments fetch failed:", assError.message);
 
       // 3. Fetch Detailed Topic Progress
       const { data: topicProgress, error: tpError } = await supabase
@@ -141,10 +149,13 @@ export default function Home() {
         } catch (e) {
           // Fallback for old comma-separated emails
           const emails = profile.training_buddy.split(',').map((e: string) => e.trim());
-          const { data: mentors } = await supabase
+          const { data: mentors, error: mentorError } = await supabase
             .from('profiles')
             .select('full_name, email, role, phone')
             .in('email', emails);
+
+          if (mentorError) console.error("Mentors by email lookup failed:", mentorError.message);
+
           mentorData = (mentors || []).map(m => ({
             full_name: m.full_name,
             email: m.email,
@@ -167,13 +178,18 @@ export default function Home() {
       setAllMentors(mentorData);
 
       // 5. Fetch Last Activity to determine Resume Module
-      const { data: lastLog } = await supabase
+      const { data: lastLog, error: logError } = await supabase
         .from('mentor_activity_logs')
         .select('module_id')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+      
+      if (logError && logError.code !== 'PGRST116') {
+        // PGRST116 is code for 'no rows returned' from .single(), which is okay
+        console.error("Activity log lookup failed:", logError.message);
+      }
 
       let targetModule = null;
       if (lastLog?.module_id && lastLog.module_id !== 'System') {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function POST(request: Request) {
@@ -16,6 +16,9 @@ export async function POST(request: Request) {
         }
 
         // 1. Create the user in Supabase Auth
+        let userId: string | undefined;
+        let isExistingUser = false;
+
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
@@ -28,10 +31,24 @@ export async function POST(request: Request) {
         });
 
         if (authError) {
-            return NextResponse.json({ error: authError.message }, { status: 400 });
-        }
+            // Handle existing user conflict gracefully for profile synchronization
+            if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already exists')) {
+                const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+                if (listError) return NextResponse.json({ error: listError.message }, { status: 500 });
 
-        const userId = authData.user?.id;
+                const existingUser = usersData.users.find((u: any) => u.email === email);
+                if (existingUser) {
+                    userId = existingUser.id;
+                    isExistingUser = true;
+                } else {
+                    return NextResponse.json({ error: 'Identity conflict detected but user could not be mapped.' }, { status: 400 });
+                }
+            } else {
+                return NextResponse.json({ error: authError.message }, { status: 400 });
+            }
+        } else {
+            userId = authData.user?.id;
+        }
 
         // 2. Create or update the profile in the profiles table
         if (userId) {
@@ -41,13 +58,10 @@ export async function POST(request: Request) {
                 email,
                 full_name: fullName,
                 role: role || 'counsellor',
-                // Fallback to empty array string if trainingBuddy is missing, 
-                // as '' is invalid for JSONB columns
                 training_buddy: trainingBuddy || '[]',
                 temp_password: password
             };
 
-            // Only add phone if it's provided to avoid issues with missing columns or constraints
             if (phone) profileData.phone = phone;
 
             const { error: profileError } = await supabaseAdmin
@@ -57,22 +71,22 @@ export async function POST(request: Request) {
             if (profileError) {
                 console.error('Profile synchronization error:', profileError);
                 return NextResponse.json({
-                    error: `Auth user created but profile synchronization failed: ${profileError.message}`,
-                    details: profileError
+                    error: `Auth confirmed but profile mapping failed: ${profileError.message}`
                 }, { status: 500 });
             }
 
-            // 3. Initialize progress tracking activity
+            // 3. Log Provisioning Activity
             await supabaseAdmin.from('mentor_activity_logs').insert([{
                 user_id: userId,
                 activity_type: 'signup',
-                content_title: 'Account Provisioned by Admin',
+                content_title: isExistingUser ? 'Account Re-provisioned / Synced' : 'Account Provisioned by Admin',
                 module_id: 'System'
             }]);
         }
 
         return NextResponse.json({
             success: true,
+            message: isExistingUser ? 'Profile synchronized with existing credentials.' : 'New account provisioned successfully.',
             user: {
                 id: userId,
                 email,

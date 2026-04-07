@@ -59,6 +59,9 @@ export default function Sidebar({ isCollapsed, setIsCollapsed, userName, userEma
     const searchParams = useSearchParams();
     const initials = getInitials(userName || 'M');
 
+    // Disable sidebar for Nutripreneur role
+    if (userRole === 'nutripreneur') return null;
+
     // Use admin specific items if role is admin
     const currentNavItems = userRole === 'admin' ? adminNavItems : navItems;
 

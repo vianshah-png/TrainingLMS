@@ -1,8 +1,14 @@
 import crypto from 'crypto';
 
-// The key must be 32 bytes for aes-256-cbc
-// We use a fallback key for development but it should be set in production
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'BalanceNutritionSecretKey1234567';
+// The key must be exactly 32 bytes for aes-256-cbc
+const ENCRYPTION_KEY_RAW = process.env.ENCRYPTION_KEY || 'BalanceNutritionSecretKey1234567BN'; // 34 chars example
+
+// Ensure it's exactly 32 bytes
+const ENCRYPTION_KEY = ENCRYPTION_KEY_RAW.slice(0, 32).padEnd(32, '0');
+
+if (!process.env.ENCRYPTION_KEY && process.env.NODE_ENV === 'production') {
+    console.error("FATAL: ENCRYPTION_KEY is missing in production. Using insecure fallback.");
+}
 
 export function encryptData(data: any): string {
     const iv = crypto.randomBytes(16);

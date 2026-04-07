@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Mail, ChevronRight, Sparkles, UserCheck, User, ShieldCheck, Briefcase } from "lucide-react";
+import { Lock, Mail, ChevronRight, Sparkles, UserCheck, User, ShieldCheck, Briefcase, Leaf } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
     const [view, setView] = useState<'selection' | 'form'>('selection');
-    const [selectedRole, setSelectedRole] = useState<'interviewee' | 'admin'>('interviewee');
+    const [selectedRole, setSelectedRole] = useState<'interviewee' | 'admin' | 'nutripreneur'>('interviewee');
     const [mode, setMode] = useState<'login' | 'signup'>('login');
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -34,17 +34,29 @@ export default function LoginPage() {
         setSuccess("");
         setLoading(true);
 
-        const { error, data } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        const { error: authError, data } = await supabase.auth.signInWithPassword({ email, password });
 
-        if (error) {
-            setError(error.message);
+        if (authError) {
+            setError(authError.message);
             setLoading(false);
+            return;
+        }
+
+        // Fetch profile to determine correct destination
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.session.user.id)
+            .single();
+
+        const role = profile?.role;
+
+        if (role === 'nutripreneur') {
+            router.push('/nutripreneur');
+        } else if (role === 'admin' || role === 'moderator') {
+            router.push('/admin');
         } else {
-            // Role verification logic could go here if needed
-            router.push("/");
+            router.push('/');
         }
     };
 
@@ -61,23 +73,25 @@ export default function LoginPage() {
         }
 
         try {
-            const response = await fetch('/api/auth/signup', {
+            // Route signup to the correct API based on selected portal
+            const endpoint = selectedRole === 'nutripreneur'
+                ? '/api/auth/nutripreneur-signup'
+                : '/api/auth/signup';
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    fullName: fullName.trim()
-                }),
+                body: JSON.stringify({ email, password, fullName: fullName.trim() }),
             });
 
             const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Signup failed');
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Signup failed');
-            }
-
-            setSuccess("Account created successfully! You can now log in without email verification.");
+            setSuccess(
+                selectedRole === 'nutripreneur'
+                    ? 'Welcome to the Nutripreneur Academy! You can now sign in.'
+                    : 'Account created successfully! You can now log in.'
+            );
             setMode('login');
             setPassword("");
         } catch (err: any) {
@@ -87,10 +101,10 @@ export default function LoginPage() {
         }
     };
 
-    const enterForm = (role: 'interviewee' | 'admin') => {
+    const enterForm = (role: 'interviewee' | 'admin' | 'nutripreneur') => {
         setSelectedRole(role);
-        // Admin only have login, no signup in this flow for security
-        if (role !== 'interviewee') {
+        // Admin-only: no signup for security
+        if (role === 'admin') {
             setMode('login');
         }
         setView('form');
@@ -133,9 +147,9 @@ export default function LoginPage() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                            className="grid grid-cols-1 md:grid-cols-3 gap-6"
                         >
-                            {/* Path 1: Interviewees */}
+                            {/* Path 1: Counsellors */}
                             <div
                                 onClick={() => enterForm('interviewee')}
                                 className="premium-card p-10 bg-white/70 backdrop-blur-2xl border border-white hover:border-[#00B6C1]/30 transition-all cursor-pointer group"
@@ -152,7 +166,27 @@ export default function LoginPage() {
                                 </button>
                             </div>
 
-                            {/* Path 2: Official Access (Founder & Admin) */}
+                            {/* Path 2: Nutripreneur Academy */}
+                            <div
+                                onClick={() => enterForm('nutripreneur')}
+                                className="premium-card p-10 border border-white cursor-pointer group flex flex-col transition-all overflow-hidden relative"
+                                style={{ background: 'linear-gradient(135deg, #0D2A1E, #1A3A2A)', borderColor: 'rgba(201,168,76,0.25)' }}
+                            >
+                                <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle at top right, #C9A84C, transparent 60%)' }} />
+                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-xl relative z-10 transition-all group-hover:scale-110"
+                                    style={{ background: 'linear-gradient(135deg, #C9A84C, #A8843A)' }}>
+                                    <Leaf size={32} style={{ color: '#0D2A1E' }} />
+                                </div>
+                                <h2 className="text-2xl font-serif mb-3 relative z-10" style={{ color: '#FAF7F0' }}>Nutripreneur Academy</h2>
+                                <p className="text-sm font-medium mb-8 leading-relaxed relative z-10" style={{ color: 'rgba(250,247,240,0.5)' }}>
+                                    Elite entrepreneurial training for health educators building India's nutrition economy.
+                                </p>
+                                <button className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-all relative z-10" style={{ color: '#C9A84C' }}>
+                                    Enter Academy <ChevronRight size={16} />
+                                </button>
+                            </div>
+
+                            {/* Path 3: Admin Portal */}
                             <div
                                 onClick={() => enterForm('admin')}
                                 className="premium-card p-10 bg-white/40 border border-white hover:border-[#00B6C1]/30 transition-all cursor-pointer group flex flex-col items-center justify-center text-center gap-4"
@@ -190,23 +224,36 @@ export default function LoginPage() {
                                 <div className="text-center mt-4 mb-8">
                                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FAFCEE] border border-[#0E5858]/5 rounded-full mb-4">
                                         <span className="w-1.5 h-1.5 rounded-full bg-[#00B6C1]"></span>
-                                        <span className="text-[9px] font-bold text-[#0E5858] uppercase tracking-widest">{selectedRole} session</span>
+                                        <span className="text-[9px] font-bold text-[#0E5858] uppercase tracking-widest">
+                                            {selectedRole === 'interviewee' ? 'Counsellor' : selectedRole === 'nutripreneur' ? 'Nutripreneur Academy' : 'Admin'} Session
+                                        </span>
                                     </div>
                                     <h2 className="text-2xl font-serif text-[#0E5858]">
                                         {mode === 'login' ? 'Welcome Back' : 'Get Started'}
                                     </h2>
                                 </div>
 
-                                {selectedRole === 'interviewee' && (
-                                    <div className="flex bg-[#FAFCEE] rounded-2xl p-1 mb-8 border border-[#0E5858]/5">
+                                {(selectedRole === 'interviewee' || selectedRole === 'nutripreneur') && (
+                                    <div className="flex rounded-2xl p-1 mb-8 border"
+                                        style={selectedRole === 'nutripreneur'
+                                            ? { background: 'rgba(201,168,76,0.08)', borderColor: 'rgba(201,168,76,0.2)' }
+                                            : { background: '#FAFCEE', borderColor: 'rgba(14,88,88,0.05)' }
+                                        }
+                                    >
                                         <button
                                             onClick={() => setMode('login')}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/40'}`}
+                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'login'
+                                                ? (selectedRole === 'nutripreneur' ? 'text-[#0D2A1E] shadow-lg' : 'bg-[#0E5858] text-white shadow-lg')
+                                                : 'text-[#0E5858]/40'}`}
+                                            style={mode === 'login' && selectedRole === 'nutripreneur' ? { background: 'linear-gradient(135deg, #C9A84C, #A8843A)' } : {}}
                                         > Log In </button>
                                         <button
                                             onClick={() => setMode('signup')}
-                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'signup' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/40'}`}
-                                        > Sign Up </button>
+                                            className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'signup'
+                                                ? (selectedRole === 'nutripreneur' ? 'text-[#0D2A1E] shadow-lg' : 'bg-[#0E5858] text-white shadow-lg')
+                                                : 'text-[#0E5858]/40'}`}
+                                            style={mode === 'signup' && selectedRole === 'nutripreneur' ? { background: 'linear-gradient(135deg, #C9A84C, #A8843A)' } : {}}
+                                        > Join </button>
                                     </div>
                                 )}
 

@@ -127,13 +127,15 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                     console.error("Critical Profile Sync Failure:", pe);
                 }
 
-                await supabase.from('assessment_logs').insert([{
+                const { error: insertError } = await supabase.from('assessment_logs').insert([{
                     user_id: session.user.id,
                     topic_code: topicCode,
                     score: finalScore,
                     total_questions: gradeData.total,
                     raw_data: { questions, answers: finalAnswers, gradedResults: gradeData.results, time_spent: 600 - timeLeft }
                 }]);
+
+                if (insertError) throw new Error(`Database save failed: ${insertError.message}`);
             }
 
             setShowResult(true);
