@@ -183,28 +183,21 @@ export default function RootLayout({
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Show nothing until auth is checked to prevent flickering
-  if (!isAuthChecked) {
-    return (
-      <html lang="en">
-        <body className="bg-[#FAFCEE] flex items-center justify-center min-h-screen">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="animate-spin text-[#00B6C1]" size={40} />
-            <p className="text-[10px] font-bold text-[#0E5858]/40 uppercase tracking-[0.2em]">Verifying Session...</p>
-          </div>
-          <Analytics />
-        </body>
-      </html>
-    );
-  }
-
   // Pure login page OR Nutripreneur portal without app shell
   const isNutripreneurPath = pathname.startsWith('/nutripreneur');
+  
   if (isLoginPage || isNutripreneurPath) {
     return (
       <html lang="en">
         <body className={`${playfair.variable} ${outfit.variable} font-sans text-[#0E5858] bg-[#FAFCEE] antialiased overflow-x-hidden`}>
-          {children}
+          {!isAuthChecked ? (
+            <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+              <Loader2 className="animate-spin text-[#00B6C1]" size={40} />
+              <p className="text-[10px] font-bold text-[#0E5858]/40 uppercase tracking-[0.2em]">Verifying Session...</p>
+            </div>
+          ) : (
+            children
+          )}
           <Analytics />
         </body>
       </html>
@@ -299,7 +292,14 @@ export default function RootLayout({
             </header>
 
             <main className="relative z-0 min-h-[calc(100vh-89px)]">
-              {children}
+              {!isAuthChecked ? (
+                <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+                  <Loader2 className="animate-spin text-[#00B6C1]" size={40} />
+                  <p className="text-[10px] font-bold text-[#0E5858]/40 uppercase tracking-[0.2em]">Verifying Session...</p>
+                </div>
+              ) : (
+                children
+              )}
             </main>
 
             {/* Subtle Gradient Background Blobs */}
