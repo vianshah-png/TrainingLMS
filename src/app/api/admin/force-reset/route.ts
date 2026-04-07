@@ -54,14 +54,22 @@ export async function POST(request: Request) {
                 userId = created.user?.id;
             }
 
-            // 4. Ensure profile exists
+            // 4. Ensure profile exists - Non-destructive
             if (userId) {
-                await supabaseAdmin.from('profiles').upsert({
-                    id: userId,
-                    email: counsellor.email,
-                    full_name: counsellor.name,
-                    role: 'counsellor'
-                });
+                const { data: profile } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', userId)
+                    .single();
+
+                if (!profile) {
+                    await supabaseAdmin.from('profiles').insert({
+                        id: userId,
+                        email: counsellor.email,
+                        full_name: counsellor.name,
+                        role: 'counsellor'
+                    });
+                }
             }
 
             results.push({ email: counsellor.email, status: 'synced' });

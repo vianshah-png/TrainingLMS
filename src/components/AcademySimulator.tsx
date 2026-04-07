@@ -4,13 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, X, Send, User, Bot, Loader2, Sparkles, MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity";
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
 }
 
-export default function ClinicalSimulator({ topicTitle, topicContent, topicCode }: { topicTitle: string, topicContent: string, topicCode: string }) {
+export default function AcademySimulator({ topicTitle, topicContent, topicCode }: { topicTitle: string, topicContent: string, topicCode: string }) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
@@ -45,6 +46,7 @@ export default function ClinicalSimulator({ topicTitle, topicContent, topicCode 
 
     const startSimulation = () => {
         setIsOpen(true);
+        logActivity('start_simulation', { topicCode, contentTitle: topicTitle });
         if (messages.length === 0) {
             const initialMessage = "Hello, I was looking at Balance Nutrition. Can you tell me more about " + topicTitle + "?";
             setMessages([{ role: 'assistant', content: initialMessage }]);

@@ -65,10 +65,7 @@ export default function TrainingPage() {
                                     />
                                 </div>
                                 <div className="flex items-center gap-5">
-                                    <div className="flex items-center gap-2 text-gray-300 text-[11px] font-bold">
-                                        <Clock size={14} />
-                                        <span>{module.topics.length * 30} mins</span>
-                                    </div>
+
                                     <button className="flex items-center gap-2 text-[#00B6C1] text-sm font-bold group-hover:translate-x-1 transition-all">
                                         <span>{module.progress === 100 ? 'Review' : 'Continue'}</span>
                                         <ArrowRight size={16} />

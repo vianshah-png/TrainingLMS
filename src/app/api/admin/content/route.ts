@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     if (!auth.authorized) return auth.response;
 
     try {
-        const { moduleId, topicTitle, contentType, contentLink } = await request.json();
+        const { id, topicCode, moduleId, topicTitle, contentType, contentLink } = await request.json();
 
         // 2. Validate input
         if (!moduleId || !topicTitle || !contentType || !contentLink) {
@@ -16,17 +16,20 @@ export async function POST(request: Request) {
         }
 
         // 3. Upsert into syllabus_content
-        // We use an upsert based on (module_id, title) to allow updating existing entries
+        const updateData: any = {
+            topic_code: topicCode || `DYN-${Date.now()}`,
+            module_id: moduleId,
+            title: topicTitle,
+            content_type: contentType,
+            content: contentLink,
+            updated_at: new Date().toISOString()
+        };
+
+        if (id) updateData.id = id;
+
         const { data, error } = await supabaseAdmin
             .from('syllabus_content')
-            .upsert({
-                topic_code: `DYN-${Date.now()}`,
-                module_id: moduleId,
-                title: topicTitle,
-                content_type: contentType,
-                content: contentLink,
-                updated_at: new Date().toISOString()
-            })
+            .upsert(updateData)
             .select();
 
         if (error) {

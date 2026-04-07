@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Sparkles, Loader2, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity";
 
 export default function SummaryGrader({ topicTitle, topicContent, topicCode }: { topicTitle: string, topicContent: string, topicCode: string }) {
     const [summary, setSummary] = useState("");
@@ -14,6 +15,7 @@ export default function SummaryGrader({ topicTitle, topicContent, topicCode }: {
     const gradeSummary = async () => {
         if (!summary.trim()) return;
         setLoading(true);
+        logActivity('start_quiz', { topicCode, contentTitle: topicTitle + ' (Summary)' });
         try {
             const response = await fetch("/api/grade-summary", {
                 method: "POST",
@@ -49,6 +51,13 @@ export default function SummaryGrader({ topicTitle, topicContent, topicCode }: {
                     ai_feedback: data.feedback,
                     score: data.score
                 }]);
+
+                // Log to activity trail
+                await logActivity('complete_quiz', {
+                    topicCode,
+                    contentTitle: topicTitle,
+                    score: data.score
+                });
             }
         } catch (error) {
             console.error("Error grading summary:", error);

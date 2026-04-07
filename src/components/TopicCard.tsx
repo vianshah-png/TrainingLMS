@@ -29,10 +29,12 @@ import {
     FlaskConical,
     School,
     HeartPulse,
-    Calendar
+    Calendar,
+    Mail,
+    MessageCircle
 } from "lucide-react";
 import YouTubePlayer from "./YouTubePlayer";
-import ClinicalSimulator from "./ClinicalSimulator";
+import AcademySimulator from "./AcademySimulator";
 import AIAssessment from "./AIAssessment";
 import SummaryGrader from "./SummaryGrader";
 import AssignmentForm from "./AssignmentForm";
@@ -61,12 +63,9 @@ function getEmbedUrl(url: string | undefined): string | null {
         return `https://www.youtube.com/embed/${ytMatch[2]}`;
     }
 
-    // Google Drive
+    // Google Drive - Disable embedding as it often violates CSP
     if (url.includes('drive.google.com')) {
-        const driveMatch = url.match(/\/file\/d\/([^\/]+)/);
-        if (driveMatch) {
-            return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
-        }
+        return null;
     }
 
     // Zoom
@@ -77,20 +76,22 @@ function getEmbedUrl(url: string | undefined): string | null {
     return null;
 }
 
-function getDocEmbedUrl(url: string): string {
+function getDocEmbedUrl(url: string | null): string {
+    if (!url) return '';
     if (url.includes('docs.google.com/presentation')) {
-        // Use /embed for better iframe rendering in slideshow mode
         const idMatch = url.match(/\/d\/([^\/]+)/);
         if (idMatch) {
             return `https://docs.google.com/presentation/d/${idMatch[1]}/embed?start=false&loop=false&delayms=3000`;
         }
         return url.replace(/\/(edit|preview|present).*$/, '/embed');
     }
-    if (url.includes('docs.google.com')) {
-        return url.replace(/\/(edit|view|present).*$/, '/preview');
+    if (url.includes('docs.google.com') || url.includes('drive.google.com')) {
+        return url.replace(/\/(edit|view|present|view\?usp=sharing).*$/, '/preview');
     }
     return url;
 }
+
+
 
 export default function TopicCard({ topic, index, isCompleted, onToggleComplete, onMoveNext, isLastTopic, userId, isEditMode, onEdit }: TopicCardProps) {
     const [videoCompleted, setVideoCompleted] = useState(false);
@@ -99,6 +100,30 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
     const [showHealthPopup, setShowHealthPopup] = useState(false);
     const [selectedCaseStudy, setSelectedCaseStudy] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [emailStatus, setEmailStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+
+    const sendMockCallEmail = async (mentorName: string, mentorEmail: string) => {
+        const key = mentorEmail;
+        setEmailStatus(prev => ({ ...prev, [key]: 'sending' }));
+        try {
+            const res = await fetch('/api/send-mock-call-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mentorName,
+                    mentorEmail,
+                    counselorEmail: undefined, // server uses session if needed
+                    counselorName: undefined,
+                }),
+            });
+            if (!res.ok) throw new Error('Failed');
+            setEmailStatus(prev => ({ ...prev, [key]: 'sent' }));
+            setTimeout(() => setEmailStatus(prev => ({ ...prev, [key]: 'idle' })), 4000);
+        } catch {
+            setEmailStatus(prev => ({ ...prev, [key]: 'error' }));
+            setTimeout(() => setEmailStatus(prev => ({ ...prev, [key]: 'idle' })), 3000);
+        }
+    };
 
     // Find main video/media link
     const mediaLink = topic.links?.find(l =>
@@ -108,6 +133,11 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
         l.url.includes('zoom.us')
     );
     const embedUrl = getEmbedUrl(mediaLink?.url);
+
+    // Links to display in the UI (hides the media link if it's playing as a video, unless in edit mode)
+    const displayLinks = isEditMode
+        ? topic.links
+        : topic.links?.filter(link => !(embedUrl && link === mediaLink));
 
     // Persist progress to local storage
     useEffect(() => {
@@ -291,7 +321,37 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                         </div>
 
                         <div className="flex flex-wrap items-start gap-8">
-                            {topic.outcome && (
+                            {isEditMode ? (
+                                <div className="flex-1 min-w-[300px] flex items-start gap-4 p-5 bg-blue-50/30 rounded-3xl border border-blue-50/50">
+                                    <div className="shrink-0 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
+                                        <Sparkles size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-bold text-blue-700/60 uppercase tracking-widest mb-1.5">Configure Topic</p>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Learning Outcome</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full text-sm font-bold text-[#0E5858] bg-white p-2 rounded-lg border border-[#0E5858]/10 focus:outline-[#00B6C1]"
+                                                    value={topic.outcome || ""}
+                                                    placeholder="Define what the user will learn..."
+                                                    onChange={(e) => onEdit?.({ outcome: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Layout Type:</label>
+                                                <button
+                                                    onClick={() => onEdit?.({ layout: topic.layout === 'grid' ? undefined : 'grid' })}
+                                                    className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${topic.layout === 'grid' ? 'bg-[#00B6C1] text-white' : 'bg-gray-100 text-gray-400'}`}
+                                                >
+                                                    {topic.layout === 'grid' ? 'Card Grid' : 'Standard List'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : topic.outcome && (
                                 <div className="flex-1 min-w-[300px] flex items-start gap-4 p-5 bg-green-50/30 rounded-3xl border border-green-50/50">
                                     <div className="shrink-0 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-green-600 shadow-sm">
                                         <Target size={20} />
@@ -303,7 +363,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 </div>
                             )}
 
-                            {topic.links && topic.links.length > 0 && !topic.caseStudyLinks && (
+                            {displayLinks && displayLinks.length > 0 && !topic.caseStudyLinks && (
                                 <div className="space-y-6 flex-1 min-w-[300px]">
                                     <div className="flex items-center justify-between mb-4 px-1">
                                         <div className="flex items-center gap-4">
@@ -321,7 +381,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
 
                                     {isEditMode ? (
                                         <div className="space-y-4">
-                                            {topic.links.map((link, idx) => (
+                                            {topic.links?.map((link, idx) => (
                                                 <div key={idx} className="flex flex-col sm:flex-row gap-4 items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
                                                     <input
                                                         type="text"
@@ -334,17 +394,27 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                             onEdit?.({ links: newLinks });
                                                         }}
                                                     />
-                                                    <input
-                                                        type="url"
-                                                        value={link.url}
-                                                        placeholder="https://"
-                                                        className="w-full sm:flex-[2] p-3 border-2 border-dashed border-[#0E5858]/20 rounded-xl focus:border-[#00B6C1] outline-none text-sm text-gray-500"
-                                                        onChange={(e) => {
-                                                            const newLinks = [...(topic.links || [])];
-                                                            newLinks[idx] = { ...newLinks[idx], url: e.target.value };
-                                                            onEdit?.({ links: newLinks });
-                                                        }}
-                                                    />
+                                                    <div className="w-full sm:flex-[2] relative">
+                                                        <input
+                                                            type="url"
+                                                            value={link.url}
+                                                            placeholder="https://"
+                                                            className={`w-full p-3 border-2 border-dashed rounded-xl focus:border-[#00B6C1] outline-none text-sm ${(link.url.includes('youtu') || link.url.includes('drive') || link.url.includes('zoom'))
+                                                                ? 'border-[#00B6C1]/50 text-[#00B6C1] bg-[#00B6C1]/5'
+                                                                : 'border-[#0E5858]/20 text-gray-500'
+                                                                }`}
+                                                            onChange={(e) => {
+                                                                const newLinks = [...(topic.links || [])];
+                                                                newLinks[idx] = { ...newLinks[idx], url: e.target.value };
+                                                                onEdit?.({ links: newLinks });
+                                                            }}
+                                                        />
+                                                        {(link.url.includes('youtu') || link.url.includes('drive') || link.url.includes('zoom')) && (
+                                                            <div className="absolute top-0 right-0 -trany-full flex items-center gap-1.5 px-2 py-0.5 bg-[#00B6C1] text-white rounded-t-lg text-[7px] font-black uppercase tracking-widest">
+                                                                <Play size={8} /> Active Player Link
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={() => {
                                                             const newLinks = [...(topic.links || [])];
@@ -369,7 +439,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         </div>
                                     ) : topic.layout === 'grid' ? (
                                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                            {topic.links.map(link => (
+                                            {displayLinks.map(link => (
                                                 <motion.a
                                                     key={link.label}
                                                     href={link.url}
@@ -381,7 +451,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                             e.preventDefault();
                                                             setShowHealthPopup(true);
                                                         }
-                                                        logActivity('view_content', { topicCode: topic.code, contentTitle: link.label });
+                                                        logActivity('click_link', { topicCode: topic.code, contentTitle: link.label });
                                                     }}
                                                     className="group/grid-card flex flex-col items-center text-center p-6 bg-white rounded-[2rem] shadow-sm hover:shadow-2xl transition-all border border-[#0E5858]/5 hover:border-[#00B6C1]/20 relative overflow-hidden aspect-[4/5] justify-center"
                                                 >
@@ -412,13 +482,13 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {topic.links.map(link => (
+                                            {displayLinks.map(link => (
                                                 <a
                                                     key={link.label}
                                                     href={link.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    onClick={() => logActivity('view_content', { topicCode: topic.code, contentTitle: link.label })}
+                                                    onClick={() => logActivity('click_link', { topicCode: topic.code, contentTitle: link.label })}
                                                     className="group/link flex items-center justify-between px-4 py-3 bg-white text-[#0E5858] shadow-sm hover:shadow-xl rounded-2xl text-[11px] font-bold border border-[#0E5858]/5 hover:border-[#00B6C1]/20 transition-all"
                                                 >
                                                     <div className="flex items-center gap-3">
@@ -465,21 +535,91 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             <Calendar size={24} />
                                         </div>
                                         <div>
-                                            <h3 className="text-2xl font-serif text-[#0E5858]">Mock Call Scheduler</h3>
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select your preferred slot</p>
+                                            <h3 className="text-2xl font-serif text-[#0E5858]">Schedule Your Mock Call</h3>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Contact a mentor to schedule</p>
                                         </div>
                                     </div>
 
-                                    <div className="premium-card bg-white rounded-[2.5rem] overflow-hidden border border-[#0E5858]/10 shadow-3xl h-[700px] relative">
-                                        <iframe
-                                            src={topic.bookingUrl}
-                                            className="w-full h-full border-0"
-                                            title="Schedule Mock Call"
-                                        />
-                                        <div className="absolute top-0 right-0 p-6 pointer-events-none">
-                                            <div className="bg-[#FAFCEE]/80 backdrop-blur-md px-4 py-2 rounded-full border border-[#0E5858]/5 flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                                <span className="text-[8px] font-black text-[#0E5858] uppercase tracking-widest">Live Calendar Connection</span>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Mentor Epshita */}
+                                        <div className="premium-card p-6 bg-white rounded-3xl border border-[#0E5858]/10 shadow-xl flex flex-col gap-6 relative overflow-hidden group/contact">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#00B6C1]/5 rounded-bl-full -z-10 group-hover/contact:scale-150 transition-transform duration-700"></div>
+
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 rounded-full bg-[#FAFCEE] flex items-center justify-center text-[#0E5858] font-serif text-2xl shadow-inner border border-[#0E5858]/10">
+                                                    E
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xl font-serif text-[#0E5858]">Mentor Epshita</h4>
+                                                    <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-widest">Training Lead</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-3 mt-auto">
+                                                <button
+                                                    onClick={() => sendMockCallEmail('Mentor Epshita', 'mentor.epshita@balancenutrition.in')}
+                                                    disabled={emailStatus['mentor.epshita@balancenutrition.in'] === 'sending' || emailStatus['mentor.epshita@balancenutrition.in'] === 'sent'}
+                                                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${emailStatus['mentor.epshita@balancenutrition.in'] === 'sent'
+                                                        ? 'bg-green-500 text-white'
+                                                        : emailStatus['mentor.epshita@balancenutrition.in'] === 'error'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : emailStatus['mentor.epshita@balancenutrition.in'] === 'sending'
+                                                                ? 'bg-[#0E5858]/60 text-white cursor-wait'
+                                                                : 'bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white'
+                                                        }`}
+                                                >
+                                                    <Mail size={16} />
+                                                    {emailStatus['mentor.epshita@balancenutrition.in'] === 'sending' ? 'Sending...' : emailStatus['mentor.epshita@balancenutrition.in'] === 'sent' ? '✓ Email Sent!' : emailStatus['mentor.epshita@balancenutrition.in'] === 'error' ? 'Failed — Retry' : 'Email Epshita'}
+                                                </button>
+                                                <a
+                                                    href="https://wa.me/917021963284?text=Hi%20Mentor%20Epshita,%20I%20would%20like%20to%20schedule%20my%20mock%20call."
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full flex items-center justify-center gap-2 py-3 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-xl text-sm font-bold transition-colors"
+                                                >
+                                                    <MessageCircle size={16} /> WhatsApp Epshita
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Mentor Omanshi */}
+                                        <div className="premium-card p-6 bg-white rounded-3xl border border-[#0E5858]/10 shadow-xl flex flex-col gap-6 relative overflow-hidden group/contact">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#00B6C1]/5 rounded-bl-full -z-10 group-hover/contact:scale-150 transition-transform duration-700"></div>
+
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 rounded-full bg-[#FAFCEE] flex items-center justify-center text-[#0E5858] font-serif text-2xl shadow-inner border border-[#0E5858]/10">
+                                                    O
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xl font-serif text-[#0E5858]">Mentor Omanshi</h4>
+                                                    <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-widest">Training Lead</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-3 mt-auto">
+                                                <button
+                                                    onClick={() => sendMockCallEmail('Mentor Omanshi', 'mentor.omanshi@balancenutrition.in')}
+                                                    disabled={emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending' || emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent'}
+                                                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent'
+                                                        ? 'bg-green-500 text-white'
+                                                        : emailStatus['mentor.omanshi@balancenutrition.in'] === 'error'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending'
+                                                                ? 'bg-[#0E5858]/60 text-white cursor-wait'
+                                                                : 'bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white'
+                                                        }`}
+                                                >
+                                                    <Mail size={16} />
+                                                    {emailStatus['mentor.omanshi@balancenutrition.in'] === 'sending' ? 'Sending...' : emailStatus['mentor.omanshi@balancenutrition.in'] === 'sent' ? '✓ Email Sent!' : emailStatus['mentor.omanshi@balancenutrition.in'] === 'error' ? 'Failed — Retry' : 'Email Omanshi'}
+                                                </button>
+                                                <a
+                                                    href="https://wa.me/919820017056?text=Hi%20Mentor%20Omanshi,%20I%20would%20like%20to%20schedule%20my%20mock%20call."
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full flex items-center justify-center gap-2 py-3 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-xl text-sm font-bold transition-colors"
+                                                >
+                                                    <MessageCircle size={16} /> WhatsApp Omanshi
+                                                </a>
                                             </div>
                                         </div>
                                     </div>
@@ -490,7 +630,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-bold text-[#0E5858] mb-1">Post-Booking Protocol</h4>
-                                            <p className="text-xs text-gray-400 leading-relaxed">Once you book your slot, an automated email invitation will be sent to both you and your counselor with the meeting link. Please ensure your camera is active for the mock call.</p>
+                                            <p className="text-xs text-gray-400 leading-relaxed">Once you message or email your preferred mentor, an automated email invitation will be sent to both you and your counselor with the meeting link. Please ensure your camera is active for the mock call.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -504,6 +644,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                     <button
                                         onClick={() => {
                                             setVideoCompleted(true);
+                                            logActivity('click_audit', { topicCode: topic.code, contentTitle: topic.title });
                                             setTimeout(() => {
                                                 document.getElementById(`assignment-${topic.code}`)?.scrollIntoView({ behavior: 'smooth' });
                                             }, 100);
@@ -523,7 +664,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                 whileHover={{ y: -5, scale: 1.02 }}
                                                 onClick={() => {
                                                     setSelectedCaseStudy(link);
-                                                    logActivity('view_content', { topicCode: topic.code, contentTitle: `Case Study #${i + 1}` });
+                                                    logActivity('view_case_study', { topicCode: topic.code, contentTitle: `Case Study #${i + 1}` });
                                                 }}
                                                 className="aspect-[4/5] bg-[#FAFCEE] border border-[#0E5858]/5 rounded-2xl p-4 flex flex-col justify-between cursor-pointer group/case shadow-sm hover:shadow-xl hover:bg-white transition-all overflow-hidden relative"
                                             >
@@ -546,7 +687,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 <div className={`transition-all duration-700 ${videoCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}>
                                     <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-gray-100 ring-1 ring-black/[0.03]">
                                         {embedUrl.includes('youtube.com') ? (
-                                            <YouTubePlayer videoId={embedUrl.split('/').pop() || ''} onComplete={handleVideoComplete} />
+                                            <YouTubePlayer videoId={embedUrl.split('/').pop() || ''} onComplete={handleVideoComplete} topicCode={topic.code} topicTitle={topic.title} />
                                         ) : (
                                             <iframe
                                                 src={embedUrl}
@@ -582,7 +723,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 <div className="p-8 bg-gradient-to-br from-white to-[#FAFCEE]/30 rounded-[3rem] border border-[#0E5858]/5 shadow-2xl relative overflow-hidden">
                                     {topic.hasLive ? (
                                         <>
-                                            <ClinicalSimulator topicTitle={topic.title} topicContent={topic.content} topicCode={topic.code} />
+                                            <AcademySimulator topicTitle={topic.title} topicContent={topic.content} topicCode={topic.code} />
                                             {/* Intermediate confirmation removed */}
                                         </>
                                     ) : (

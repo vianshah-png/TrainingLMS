@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Send, CheckCircle2, Loader2, ClipboardList, User, Building2, ArrowRight, UserCircle2, BrainCircuit, Sparkles, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
+import { logActivity } from "@/lib/activity";
 
 interface AssignmentFormProps {
     topicCode: string;
@@ -142,6 +143,12 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                     console.error("Audit Insert Error:", insertError);
                     throw insertError;
                 }
+
+                // Log to activity trail
+                await logActivity('submit_assignment', {
+                    topicCode,
+                    contentTitle: `Peer Audit: ${topicCode}`
+                });
 
                 setSubmitted(true);
                 if (userId) localStorage.removeItem(`bn-draft-${userId}-${topicCode}`);
@@ -302,7 +309,10 @@ export default function AssignmentForm({ topicCode, questions, persona, onComple
                             </div>
                         </div>
                         <button
-                            onClick={() => setStep("questions")}
+                            onClick={() => {
+                                setStep("questions");
+                                logActivity('start_assignment', { topicCode, contentTitle: 'Peer Audit Task Initialized' });
+                            }}
                             disabled={selectedCompanies.length < 2 || selectedDieticians.length < 2}
                             className={`w-full py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.25em] flex items-center justify-center gap-3 transition-all ${selectedCompanies.length < 2 || selectedDieticians.length < 2 ? 'bg-gray-50 text-gray-300' : 'bg-[#0E5858] text-white shadow-xl'}`}
                         >

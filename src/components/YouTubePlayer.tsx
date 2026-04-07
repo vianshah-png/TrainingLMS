@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
+import { logActivity } from '@/lib/activity';
 
 declare global {
     interface Window {
@@ -12,9 +13,11 @@ declare global {
 interface YouTubePlayerProps {
     videoId: string;
     onComplete: () => void;
+    topicCode?: string;
+    topicTitle?: string;
 }
 
-export default function YouTubePlayer({ videoId, onComplete }: YouTubePlayerProps) {
+export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTitle }: YouTubePlayerProps) {
     const playerRef = useRef<any>(null);
     const containerId = `youtube-player-${videoId}`;
 
@@ -79,8 +82,12 @@ export default function YouTubePlayer({ videoId, onComplete }: YouTubePlayerProp
         }
 
         function onPlayerStateChange(event: any) {
-            if (event.data === 0) {
+            if (event.data === 1) { // PLAYING
+                logActivity('watch_video', { topicCode, contentTitle: topicTitle || 'Video Started' });
+            }
+            if (event.data === 0) { // ENDED
                 onComplete();
+                logActivity('watch_video', { topicCode, contentTitle: `${topicTitle || 'Video'} Completed` });
             }
         }
 

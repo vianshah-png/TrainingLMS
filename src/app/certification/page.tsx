@@ -30,8 +30,8 @@ const sections = [
         ]
     },
     {
-        title: "Clinical & Program Knowledge",
-        id: "clinical",
+        title: "Nutrition & Program Knowledge",
+        id: "academy",
         questions: [
             { id: "q5", question: "Describe what an E-kit is and its purpose.", type: "text" },
             { id: "q6", question: "Which program is specifically designed for child obesity in the website?", type: "text" },
@@ -180,20 +180,20 @@ export default function CertificationPage() {
                 <header className="mb-16 text-center">
                     <div className="inline-flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-[#0E5858]/10 shadow-sm mb-6">
                         <Award className="text-[#FFCC00]" size={20} />
-                        <span className="text-[10px] font-bold text-[#0E5858] uppercase tracking-[0.2em]">Clinical Master Certification</span>
+                        <span className="text-[10px] font-bold text-[#0E5858] uppercase tracking-[0.2em]">Academy Master Certification</span>
                     </div>
                     <h1 className="text-6xl font-serif text-[#0E5858] tracking-tight leading-tight">
                         The Final <span className="text-[#00B6C1]">Audit</span>
                     </h1>
                     <p className="text-gray-400 mt-6 max-w-2xl mx-auto text-lg">
-                        This is the comprehensive assessment for Balance Nutrition Counselors. We will evaluate your knowledge of culture, clinical protocols, and operations.
+                        This is the comprehensive assessment for Balance Nutrition Counselors. We will evaluate your knowledge of culture, nutrition protocols, and operations.
                     </p>
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                     {[
-                        { icon: FileText, title: "45 Questions", desc: "Covers History, Clinical & MIS" },
-                        { icon: Clock, title: "Un-timed", desc: "Take your time for clinical depth" },
+                        { icon: FileText, title: "45 Questions", desc: "Covers History, Nutrition & MIS" },
+                        { icon: Clock, title: "Un-timed", desc: "Take your time for quality depth" },
                         { icon: Brain, title: "AI Graded", desc: "Real-time auditing of your logic" }
                     ].map((idx, i) => (
                         <div key={i} className="premium-card bg-white p-8 flex flex-col items-center text-center">

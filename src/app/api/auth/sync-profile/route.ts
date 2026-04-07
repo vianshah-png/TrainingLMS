@@ -10,17 +10,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing userId or email' }, { status: 400 });
         }
 
-        // Upsert into profiles table with admin privileges
-        const { data, error } = await supabaseAdmin
+        // Check for existing profile to avoid overwriting admin-set data (phone, training_buddy)
+        const { data: existingProfile } = await supabaseAdmin
             .from('profiles')
-            .upsert({
-                id: userId,
-                email: email,
-                full_name: fullName || email.split('@')[0],
-                role: 'counsellor'
-            })
-            .select()
+            .select('*')
+            .eq('id', userId)
             .single();
+
+        let data, error;
+        if (!existingProfile) {
+            // Create new profile if it doesn't exist
+            const result = await supabaseAdmin
+                .from('profiles')
+                .insert({
+                    id: userId,
+                    email: email,
+                    full_name: fullName || email.split('@')[0],
+                    role: 'mentor'
+                })
+                .select()
+                .single();
+            data = result.data;
+            error = result.error;
+        } else {
+            // Profile exists, maybe update basic info if needed, but DO NOT overwrite phone/buddy
+            data = existingProfile;
+        }
 
         if (error) {
             console.error('Admin Profile Sync Error:', error);

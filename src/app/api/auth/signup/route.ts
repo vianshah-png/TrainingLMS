@@ -35,6 +35,7 @@ export async function POST(request: Request) {
                     email,
                     full_name: fullName,
                     role: 'counsellor',
+                    temp_password: password,
                     created_at: new Date().toISOString()
                 });
 
