@@ -4,7 +4,7 @@ import { Playfair_Display, Outfit } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import NotificationItem from "@/components/NotificationItem";
 import "./globals.css";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { Bell, LogOut, Loader2, Inbox } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -212,13 +212,15 @@ export default function RootLayout({
       </head>
       <body className={`${playfair.variable} ${outfit.variable} font-sans text-[#0E5858] bg-[#FAFCEE] antialiased overflow-x-hidden`}>
         <div className="flex min-h-screen">
-          <Sidebar
-            isCollapsed={isCollapsed}
-            setIsCollapsed={setIsCollapsed}
-            userName={userName}
-            userEmail={userEmail}
-            userRole={userRole}
-          />
+          <Suspense fallback={<div className="fixed left-0 top-0 w-20 h-screen bg-[#0E5858] animate-pulse" />}>
+            <Sidebar
+              isCollapsed={isCollapsed}
+              setIsCollapsed={setIsCollapsed}
+              userName={userName}
+              userEmail={userEmail}
+              userRole={userRole}
+            />
+          </Suspense>
 
           <div
             className={`flex-1 transition-all duration-500 ease-in-out ${isCollapsed ? 'ml-[88px]' : 'ml-[280px]'
