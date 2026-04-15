@@ -8,12 +8,14 @@ export async function POST(request: Request) {
     if (!auth.authorized) return auth.response;
 
     try {
-        const { id, topicCode, moduleId, topicTitle, contentType, contentLink } = await request.json();
+        const { id, topicCode, moduleId, topicTitle, contentType, contentLink, tags } = await request.json();
 
         // 2. Validate input
         if (!moduleId || !topicTitle || !contentType || !contentLink) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+
+        const tagsArray = tags ? tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
 
         // 3. Upsert into syllabus_content
         const updateData: any = {
@@ -22,6 +24,7 @@ export async function POST(request: Request) {
             title: topicTitle,
             content_type: contentType,
             content: contentLink,
+            tags: tagsArray,
             updated_at: new Date().toISOString()
         };
 

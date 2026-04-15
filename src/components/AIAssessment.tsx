@@ -223,48 +223,103 @@ export default function AIAssessment({ topicTitle, topicContent, topicCode, onCo
                         key="result"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="p-8 bg-[#FAFCEE] rounded-[2.5rem] border-2 border-[#00B6C1]/20 text-center shadow-xl"
+                        className="p-8 bg-[#FAFCEE] rounded-[2.5rem] border-2 border-[#00B6C1]/20 shadow-xl"
                     >
-                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg border border-[#00B6C1]/10">
-                            <CheckCircle2 size={32} className="text-[#00B6C1]" />
-                        </div>
-                        <h3 className="text-2xl font-serif text-[#0E5858] mb-2">Audit Complete</h3>
-                        <p className="text-[10px] font-black text-[#00B6C1] mb-2 uppercase tracking-[0.2em]">Assessment Logged</p>
-
-                        {finalScoreStats && (
-                            <div className="inline-block px-8 py-3 bg-white rounded-2xl border border-[#00B6C1]/10 mb-6">
-                                <p className="text-3xl font-serif text-[#0E5858] mb-1">{Math.round((finalScoreStats.score / finalScoreStats.total) * 100)}%</p>
-                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Efficiency Rating</p>
+                        {/* Score Header */}
+                        <div className="text-center mb-8">
+                            <div className="w-24 h-24 mx-auto mb-6 relative">
+                                <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="#0E5858" strokeWidth="6" opacity="0.1" />
+                                    <circle
+                                        cx="50" cy="50" r="42" fill="none"
+                                        stroke={finalScoreStats && (finalScoreStats.score / finalScoreStats.total) >= 0.7 ? '#00B6C1' : (finalScoreStats && (finalScoreStats.score / finalScoreStats.total) >= 0.4 ? '#FFCC00' : '#FF5733')}
+                                        strokeWidth="6"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${((finalScoreStats?.score || 0) / (finalScoreStats?.total || 1)) * 264} 264`}
+                                    />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span className="text-2xl font-black text-[#0E5858]">{finalScoreStats?.score || 0}</span>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase">/ {finalScoreStats?.total || 0}</span>
+                                </div>
                             </div>
-                        )}
-
-                        <div className="p-5 bg-white/60 backdrop-blur-sm rounded-2xl text-xs text-gray-500 mb-8 border border-white leading-relaxed">
-                            Your Viva performance and score have been securely transmitted to the <strong>Founders Dashboard</strong>. Re-attempts for low scores require administrative override.
+                            <h3 className="text-2xl font-serif text-[#0E5858] mb-2">
+                                {finalScoreStats && (finalScoreStats.score / finalScoreStats.total) >= 0.7 ? 'Excellent Work!' : (finalScoreStats && (finalScoreStats.score / finalScoreStats.total) >= 0.4 ? 'Keep Practicing!' : 'Needs Improvement')}
+                            </h3>
+                            <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em]">
+                                {finalScoreStats ? Math.round((finalScoreStats.score / finalScoreStats.total) * 100) : 0}% Score · Assessment Logged
+                            </p>
                         </div>
 
-                        {finalScoreStats && finalScoreStats.results && (
-                            <div className="mt-8 space-y-4 text-left max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-widest mb-2 text-center">Protocol Justifications</p>
-                                {finalScoreStats.results.map((res, i) => (
-                                    <div key={i} className={`p-4 rounded-2xl border ${res.isCorrect ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                                        <p className="text-[11px] font-bold text-[#0E5858] mb-1">Q{i + 1}: {questions?.[i]?.question}</p>
-                                        <p className="text-[10px] text-gray-600 mb-2">
-                                            <span className="font-bold">Result:</span> {res.isCorrect ? '✅ Correct' : `❌ Incorrect (Correct: ${res.correctAnswer})`}
-                                        </p>
-                                        <div className="bg-white/50 p-3 rounded-xl border border-white">
-                                            <p className="text-[9px] font-medium text-[#0E5858]/70 leading-relaxed italic">
-                                                <span className="font-black uppercase tracking-widest text-[8px] text-[#00B6C1] block mb-1">Scoring Justification:</span>
-                                                {res.justification}
-                                            </p>
+                        {/* Answer Key */}
+                        {finalScoreStats?.results && finalScoreStats.results.length > 0 && (
+                            <div className="space-y-4 mb-8">
+                                <h4 className="text-[10px] font-black text-[#0E5858] uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <Sparkles size={12} className="text-[#00B6C1]" />
+                                    Answer Key & Review
+                                </h4>
+                                {finalScoreStats.results.map((result: any, idx: number) => (
+                                    <div
+                                        key={idx}
+                                        className={`p-5 rounded-2xl border-2 transition-all ${result.isCorrect
+                                            ? 'bg-green-50/50 border-green-200/50'
+                                            : 'bg-red-50/50 border-red-200/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${result.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'}`}>
+                                                {result.isCorrect ? <CheckCircle2 size={14} /> : <span className="text-xs font-black">✗</span>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-[#0E5858] leading-snug mb-1">Q{idx + 1}. {result.question}</p>
+                                                <div className="text-[9px] font-bold uppercase tracking-widest mb-2">
+                                                    <span className={result.isCorrect ? 'text-green-600' : 'text-red-500'}>
+                                                        {result.isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="ml-10 space-y-2">
+                                            {/* User's Answer */}
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 mt-0.5 w-20">Your Answer</span>
+                                                <span className={`text-xs font-medium leading-relaxed ${result.isCorrect ? 'text-green-700' : 'text-red-600'}`}>
+                                                    {result.providedAnswer || '(No answer provided)'}
+                                                </span>
+                                            </div>
+
+                                            {/* Correct Answer (only show if wrong) */}
+                                            {!result.isCorrect && (
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 mt-0.5 w-20">Correct</span>
+                                                    <span className="text-xs font-semibold text-green-700 leading-relaxed bg-green-50 px-2 py-0.5 rounded-md">
+                                                        {result.correctAnswer}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* AI Feedback for text answers */}
+                                            {result.aiFeedback && (
+                                                <div className="flex items-start gap-2 mt-1">
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 mt-0.5 w-20">AI Note</span>
+                                                    <span className="text-[11px] text-gray-500 italic leading-relaxed">
+                                                        {result.aiFeedback}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        <div className="mt-8 inline-flex items-center gap-3 px-8 py-3 bg-[#0E5858] text-white rounded-[1.2rem] text-xs font-bold shadow-2xl opacity-90 cursor-default">
-                            <Sparkles size={14} className="text-[#00B6C1]" />
-                            Final Audit Submitted
+                        {/* Footer */}
+                        <div className="text-center">
+                            <div className="inline-flex items-center gap-3 px-8 py-3 bg-[#0E5858] text-white rounded-[1.2rem] text-xs font-bold shadow-2xl cursor-default">
+                                <CheckCircle2 size={14} className="text-[#00B6C1]" />
+                                Synced with Admin Dashboard
+                            </div>
                         </div>
                     </motion.div>
                 )}

@@ -51,13 +51,15 @@ function ContentBankContent() {
 
             if (contentRes.data) {
                 const mapped = contentRes.data.map(d => ({
+                    id: d.id,
                     code: d.topic_code || `DYN-${d.id}`,
                     title: d.title,
                     content: d.content_type === 'video' ? 'Training Session' : 'Resource Document',
                     links: [{ url: d.content, label: 'Access Resource' }],
                     isDynamic: true,
                     moduleId: d.module_id,
-                    contentType: d.content_type
+                    contentType: d.content_type,
+                    tags: d.tags || []
                 }));
                 setDynamicResources(mapped);
             }
@@ -73,11 +75,25 @@ function ContentBankContent() {
         const q = searchParams.get('search');
         if (q) {
             setSearchQuery(q);
-            // Auto-select category if search matches a folder name
             const matchedFolder = folders.find(f => q.includes(f.name));
             if (matchedFolder) setSelectedCategory(matchedFolder.name);
         }
-    }, [searchParams, folders]);
+        
+        const shareId = searchParams.get('share');
+        if (shareId && (dynamicResources.length > 0 || (resourceModule?.topics && resourceModule.topics.length > 0))) {
+            const allRes = [...(resourceModule?.topics || []), ...dynamicResources];
+            const resource = allRes.find((r: any) => r.id === shareId || r.code === shareId);
+            
+            if (resource && !selectedVideo) {
+                const ytId = resource.links ? getYouTubeId(resource.links[0]?.url) : null;
+                if (ytId) {
+                    setSelectedVideo({ id: ytId, title: resource.title });
+                } else if (resource.links && resource.links[0]?.url && resource.links[0].url !== '#') {
+                    // prevent infinite loops of opening windows if they don't block popups
+                }
+            }
+        }
+    }, [searchParams, folders, dynamicResources, resourceModule, selectedVideo]);
 
     const DEFAULT_FOLDERS = [
         { name: 'Sales Training', prefix: 'VB' },
@@ -86,7 +102,6 @@ function ContentBankContent() {
         { name: 'Program Manuals', prefix: 'RB' },
     ];
 
-    // Merge DB folders with defaults (DB overrides defaults with same prefix)
     const allFolders = [...DEFAULT_FOLDERS];
     folders.forEach(f => {
         if (!allFolders.some(df => df.prefix === f.prefix)) {
@@ -94,29 +109,50 @@ function ContentBankContent() {
         }
     });
 
-    const categories = ["All", ...allFolders.map(f => f.name)];
-
     const allResources = [...(resourceModule?.topics || []), ...dynamicResources];
 
-    const filteredResources = allResources.filter(r => {
-        // Remove items with no link or '#' links
-        const hasValidLink = r.links && r.links.length > 0 && r.links[0].url && r.links[0].url !== '#';
-        if (!hasValidLink) return false;
+    // Filter to only non-empty folders
+    const nonEmptyFolders = allFolders.filter(f => 
+        allResources.some(r => 
+            r.code.startsWith(f.prefix) || 
+            r.title.toLowerCase().includes(f.name.toLowerCase()) ||
+            (r.code.includes('P1') && f.prefix === 'P1') || 
+            (r.code.includes('P2') && f.prefix === 'P2')
+        )
+    );
 
+    const categories = ["All", ...nonEmptyFolders.map(f => f.name)];
+
+    const filteredResources = allResources.filter(r => {
         // Search filter
         const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            r.code.toLowerCase().includes(searchQuery.toLowerCase());
+            r.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            ((r as any).tags && (r as any).tags.some((t: string) => t.toLowerCase().includes(searchQuery.toLowerCase())));
 
         if (!matchesSearch) return false;
 
         // Category filter
-        if (selectedCategory === "All") return true;
-
-        // Dynamic folder matching
-        const folder = allFolders.find(f => f.name === selectedCategory);
+        if (selectedCategory === "All") {
+            // "All" now shows items that ARE NOT in any defined non-empty folder
+            const inAnyFolder = nonEmptyFolders.some(f => 
+                r.code.startsWith(f.prefix) || 
+                r.title.toLowerCase().includes(f.name.toLowerCase()) ||
+                (r.code.includes('P1') && f.prefix === 'P1') ||
+                (r.code.includes('P2') && f.prefix === 'P2')
+            );
+            return !inAnyFolder;
+        }
+        
+        // Exact folder matching
+        const folder = nonEmptyFolders.find(f => f.name === selectedCategory);
         if (folder) {
-            return r.code.startsWith(folder.prefix) || r.title.includes(folder.name);
+            if (folder.name === "Sales Training") return r.code.startsWith('VB');
+            if (folder.name === "Phase 1") return r.code.includes('P1') || r.title.includes('Phase 1');
+            if (folder.name === "Phase 2") return r.code.includes('P2') || r.title.includes('Phase 2');
+            if (folder.name === "Program Manuals") return r.code.startsWith('RB') && !r.code.includes('PV');
+            
+            return r.code.startsWith(folder.prefix) || r.title.toLowerCase().includes(folder.name.toLowerCase());
         }
 
         return true;
@@ -278,6 +314,21 @@ function ContentBankContent() {
                                     <div className="absolute bottom-5 right-5 px-4 py-2 bg-black/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-xl border border-white/10">
                                         {ytId ? 'Training Session' : 'Resource Folder'}
                                     </div>
+
+                                    {/* Share Button */}
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const url = new URL(window.location.href);
+                                            url.searchParams.set('share', (resource as any).id || resource.code);
+                                            navigator.clipboard.writeText(url.toString());
+                                            alert('Resource link copied to clipboard!');
+                                        }}
+                                        className="absolute top-5 right-5 w-8 h-8 bg-black/40 hover:bg-white text-white hover:text-[#0E5858] rounded-full flex items-center justify-center transition-all duration-300 z-10 backdrop-blur-md opacity-0 group-hover:opacity-100 border border-white/10 shadow-xl"
+                                        title="Copy Share Link"
+                                    >
+                                        <Share2 size={12} />
+                                    </button>
                                 </div>
 
                                 {/* Content Meta */}
@@ -294,11 +345,20 @@ function ContentBankContent() {
                                         <div className="flex items-center gap-2 text-[10px] text-gray-400 font-black uppercase tracking-[0.1em]">
                                             <span>{resource.code}</span>
                                             <span className="w-1 h-1 rounded-full bg-gray-200"></span>
-                                            <span className="text-[#00B6C1]/60">Nutrition Protocol</span>
+                                            <span className="text-[#00B6C1]/60">
+                                                {allFolders.find(f => resource.code.includes(f.prefix))?.name || 'Resource Bank'}
+                                            </span>
                                         </div>
                                         <p className="mt-3 text-xs text-gray-400 leading-relaxed line-clamp-2 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-500">
                                             {resource.content}
                                         </p>
+                                        {(resource as any).tags && (resource as any).tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-3">
+                                               {(resource as any).tags.map((t: string, i: number) => (
+                                                   <span key={i} className="px-2 py-0.5 bg-[#FAFCEE] border border-[#00B6C1]/20 text-[#0E5858] text-[8px] font-bold uppercase tracking-widest rounded-md">{t}</span>
+                                               ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </motion.div>

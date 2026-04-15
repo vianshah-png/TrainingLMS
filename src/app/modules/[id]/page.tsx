@@ -24,7 +24,9 @@ import {
     Award,
     X,
     ArrowUpRight,
-    MessageSquare
+    MessageSquare,
+    MessageCircle,
+    BrainCircuit
 } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -37,6 +39,28 @@ import AIAssessment from "@/components/AIAssessment";
 import AcademySimulator from "@/components/AcademySimulator";
 import { AnimatePresence } from "framer-motion";
 import { logActivity } from "@/lib/activity";
+
+function getDocEmbedUrl(url: string | null): string {
+    if (!url) return '';
+    if (url.includes('docs.google.com/presentation')) {
+        const idMatch = url.match(/\/d\/([^\/]+)/);
+        if (idMatch) {
+            return `https://docs.google.com/presentation/d/${idMatch[1]}/embed?start=false&loop=false&delayms=3000`;
+        }
+        return url.replace(/\/(edit|preview|present).*$/, '/embed');
+    }
+    if (url.includes('docs.google.com') || url.includes('drive.google.com')) {
+        // Handle Folders specifically
+        if (url.includes('/drive/folders/') || url.includes('/drive/u/0/folders/')) {
+            const folderIdMatch = url.match(/\/folders\/([^\/?#]+)/);
+            if (folderIdMatch) {
+                return `https://drive.google.com/embeddedfolderview?id=${folderIdMatch[1]}#grid`;
+            }
+        }
+        return url.replace(/\/(edit|view|present|view\?usp=sharing).*$/, '/preview');
+    }
+    return url;
+}
 
 export default function ModulePage() {
 
@@ -56,6 +80,7 @@ export default function ModulePage() {
     const [simulationDone, setSimulationDone] = useState(false);
     const [showHealthPopup, setShowHealthPopup] = useState(false);
     const [loadingContent, setLoadingContent] = useState(true);
+    const [selectedDocument, setSelectedDocument] = useState<{ url: string, label: string } | null>(null);
 
     const [isAdmin, setIsAdmin] = useState(false);
     // Admin Edit Mode States
@@ -68,6 +93,14 @@ export default function ModulePage() {
     // Counsellor context for WhatsApp 
     const [assignedCounsellors, setAssignedCounsellors] = useState<any[]>([]);
     const [overallProgress, setOverallProgress] = useState(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+    
+    const [healthTab, setHealthTab] = useState<'doctors' | 'pharma'>('doctors');
+
+    // Scroll to top on every module change
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [moduleId]);
 
     const handleTopicEdit = (topicCode: string, updatedFields: Partial<any>) => {
         setEditedTopics(prev => ({
@@ -451,11 +484,6 @@ export default function ModulePage() {
                 return;
             }
 
-            if (moduleId === 'module-4' && !simulationDone) {
-                setShowSimulation(true);
-                return;
-            }
-
             // Universal Module Quiz Check
             if (!assessmentPassed) {
                 setShowVivaIntro(true); // This shows the quiz invitation
@@ -674,7 +702,7 @@ export default function ModulePage() {
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
-                            className="w-full max-w-2xl bg-white rounded-[3rem] p-12 shadow-2xl relative overflow-hidden"
+                            className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden"
                         >
                             <button
                                 onClick={() => setShowHealthPopup(false)}
@@ -683,49 +711,175 @@ export default function ModulePage() {
                                 <X size={24} />
                             </button>
 
-                            <div className="mb-10">
+                            <div className="mb-8 text-left">
                                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FF5733]/10 text-[#FF5733] rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
                                     <Activity size={12} />
                                     BN Health Ecosystem
                                 </div>
-                                <h2 className="text-4xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
-                                <p className="text-gray-500 font-medium italic">"Integrated support for optimized client results."</p>
+                                <h2 className="text-3xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
+                                <p className="text-gray-500 font-medium italic text-sm">"Integrated support for optimized client results."</p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <a
-                                    href="https://drive.google.com/file/d/1smbdyHpELk0-07mpUxvkTIiXG3gV5Ftp/view?usp=drive_link"
-                                    target="_blank"
-                                    className="premium-card p-8 group border border-[#0E5858]/5 hover:border-[#00B6C1]/20 flex flex-col gap-4 text-center items-center"
+                            {/* Tab Selector */}
+                            <div className="flex gap-2 mb-8 bg-[#FAFCEE] rounded-2xl p-1.5">
+                                <button
+                                    onClick={() => setHealthTab('doctors')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${healthTab === 'doctors' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/60 hover:text-[#0E5858]'}`}
                                 >
-                                    <div className="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
-                                        <FlaskConical size={28} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-serif text-[#0E5858] mb-1">BN Diagnostics</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Lab Integration & Reports</p>
-                                    </div>
-                                    <ArrowUpRight size={18} className="text-[#00B6C1] mt-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                </a>
-
-                                <a
-                                    href="https://drive.google.com/drive/folders/1GN7nDd6QmuiO2rmMB1uiQUvYeqIZPuGK?usp=sharing"
-                                    target="_blank"
-                                    className="premium-card p-8 group border border-[#0E5858]/5 hover:border-[#00B6C1]/20 flex flex-col gap-4 text-center items-center"
+                                    <Stethoscope size={16} />
+                                    Doctors
+                                </button>
+                                <button
+                                    onClick={() => setHealthTab('pharma')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${healthTab === 'pharma' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/60 hover:text-[#0E5858]'}`}
                                 >
-                                    <div className="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-all">
-                                        <Stethoscope size={28} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-serif text-[#0E5858] mb-1">BN Doctors</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Specialist Consultation Network</p>
-                                    </div>
-                                    <ArrowUpRight size={18} className="text-[#00B6C1] mt-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                </a>
+                                    <FlaskConical size={16} />
+                                    Pharma Partnerships
+                                </button>
                             </div>
 
-                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized protocols</p>
+                                        {healthTab === 'doctors' ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/Doctor_X_BN_Life.pdf', label: 'Nutrinoal Inegration' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-[#00B6C1]/10 text-[#00B6C1] flex items-center justify-center group-hover:bg-[#00B6C1] group-hover:text-white transition-all">
+                                                        <Stethoscope size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Nutrinoal Inegration</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Doctor Referral Protocol</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/BN_Smart_Clinic_Pitch.pdf', label: 'BN Smart Clinic' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-[#FFCC00]/10 text-[#FFCC00] flex items-center justify-center group-hover:bg-[#FFCC00] group-hover:text-[#0E5858] transition-all">
+                                                        <FlaskConical size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Smart Clinic</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Diagnostics & Smart Tools</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/Pharma_Pitch_Deck.pdf', label: 'Pharma Partnerships' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                                                        <FlaskConical size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Pharma Partnerships</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Pharmaceutical Alliances</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/BN_Chemist_Deck.pdf', label: 'Chemist Partnerships' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-all">
+                                                        <ShoppingBag size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Chemist Partnerships</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Retail Pharmacy Network</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <p className="mt-8 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Select a document to view protocols</p>
                         </motion.div>
+                    </motion.div>
+                )}
+
+                {/* Standard Document Overlay */}
+                {selectedDocument && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] flex items-center justify-center p-4 lg:p-12 bg-[#0E5858]/95 backdrop-blur-xl"
+                    >
+                        <div className="w-full max-w-5xl">
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h3 className="text-3xl font-serif text-white mb-1">{selectedDocument.label}</h3>
+                                    <p className="text-[#00B6C1] text-xs font-bold uppercase tracking-widest">Document Viewer</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedDocument(null)}
+                                    className="w-14 h-14 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all border border-white/10"
+                                >
+                                    <X size={28} />
+                                </button>
+                            </div>
+
+                            {(() => {
+                                const isEmbeddable = selectedDocument.url.includes('docs.google.com') ||
+                                    selectedDocument.url.includes('drive.google.com') ||
+                                    selectedDocument.url.includes('zoom.us') ||
+                                    selectedDocument.url.toLowerCase().endsWith('.mp4') ||
+                                    selectedDocument.url.toLowerCase().endsWith('.pdf');
+
+                                if (!isEmbeddable) {
+                                    return (
+                                        <div className="w-full h-[400px] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center gap-6">
+                                            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-white">
+                                                <ExternalLink size={36} />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-white/70 text-sm font-medium mb-1">This resource opens in a new browser tab</p>
+                                                <p className="text-white/30 text-[10px] uppercase tracking-widest font-bold">External website</p>
+                                            </div>
+                                            <a
+                                                href={selectedDocument.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={() => setSelectedDocument(null)}
+                                                className="px-10 py-4 bg-[#00B6C1] hover:bg-white text-white hover:text-[#0E5858] rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl"
+                                            >
+                                                Open Resource →
+                                            </a>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="w-full h-[75vh] rounded-2xl overflow-hidden shadow-2xl border border-white/5 bg-black">
+                                        <iframe
+                                            src={getDocEmbedUrl(selectedDocument.url)}
+                                            className="w-full h-full"
+                                            allow="autoplay"
+                                        />
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -752,9 +906,12 @@ export default function ModulePage() {
                     </button>
 
                     <button
-                        onClick={() => router.forward()}
-                        className="h-12 px-6 rounded-2xl font-bold shadow-lg flex items-center gap-2 transition-all bg-white text-[#0E5858] hover:bg-green-50 border border-green-100"
-                        title="Go Forward"
+                        onClick={() => {
+                            if (nextModule) router.push(`/modules/${nextModule.id}`);
+                        }}
+                        className={`h-12 px-6 rounded-2xl font-bold shadow-lg flex items-center gap-2 transition-all ${nextModule ? 'bg-white text-[#0E5858] hover:bg-green-50 border border-green-100' : 'bg-gray-50 text-gray-300 opacity-50 cursor-not-allowed border-gray-100'}`}
+                        title="Next Module"
+                        disabled={!nextModule}
                     >
                         <span className="hidden md:inline">Forward</span>
                         <ChevronRight size={20} />
@@ -783,7 +940,7 @@ export default function ModulePage() {
                     </div>
                 )}
 
-                <div className="lg:col-span-8">
+                <div className="lg:col-span-12">
                     <motion.div variants={topicVariants} className="flex items-center gap-3 mb-6">
                         <span className="badge-teal">CURRICULUM v3.1</span>
                         <span className="text-[#0E5858]/20 font-light">•</span>
@@ -797,32 +954,11 @@ export default function ModulePage() {
                     </motion.h1>
                     <motion.p
                         variants={topicVariants}
-                        className="text-2xl text-gray-500 leading-relaxed max-w-3xl italic font-light"
+                        className="text-2xl text-gray-500 leading-relaxed max-w-5xl italic font-light"
                     >
                         “{baseModule.subtitle || baseModule.description}”
                     </motion.p>
                 </div>
-
-                <motion.div variants={topicVariants} className="lg:col-span-4 bg-[#0E5858] rounded-[3rem] p-10 text-white shadow-3xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-1000"></div>
-                    <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-[0.3em] mb-6">Learning Metrics</p>
-                    <div className="space-y-8">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-white/10 rounded-2xl"><BookOpen size={20} /></div>
-                                <span className="text-sm font-medium">Total Sections</span>
-                            </div>
-                            <span className="text-lg font-serif">{moduleTopics.length}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-white/10 rounded-2xl"><Sparkles size={20} /></div>
-                                <span className="text-sm font-medium">Difficulty level</span>
-                            </div>
-                            <span className="text-sm font-bold uppercase tracking-widest text-[#00B6C1]">Advanced</span>
-                        </div>
-                    </div>
-                </motion.div>
             </header>
 
 
@@ -979,26 +1115,76 @@ export default function ModulePage() {
                                 { title: "Nutripreneur", url: "https://nutripreneur.balancenutrition.in/", desc: "Entrepreneurial Learning Platform", icon: Target, color: "#00B6C1" },
                                 { title: "BN Franchise", url: "https://bnlifecentre.balancenutrition.in/#", desc: "Life Centre & Franchise Operations", icon: Globe, color: "#0E5858" },
                                 { title: "BN Health", url: "#", desc: "Diagnostics & Doctors Network", icon: Activity, color: "#FF5733", isPopup: true },
-                                { title: "Corporate Wellness", url: "https://drive.google.com/file/d/1YC6Yoz4NSgTsMr65hkc4fHtKApPI3xgM/view?usp=drive_link", desc: "Enterprise Health Partnerships", icon: Building2, color: "#8E44AD" },
-                                { title: "Educational Institute", url: "https://drive.google.com/drive/folders/18NQXel0C-rHSOX9TdTo20liyE67jjz-5?usp=sharing", desc: "Student & Academic Health Programs", icon: School, color: "#27AE60" }
+                                { title: "Corporate Wellness", url: "/docs/corporate-wellness-brochure.pdf", desc: "Enterprise Health Partnerships", icon: Building2, color: "#8E44AD" },
+                                { title: "Gym & B2B Partnerships", url: "/Gym_Partnerships.pdf", desc: "Commercial & Business Tie-ups", icon: Dumbbell, color: "#27AE60" }
                             ].map((link, i) => (
-                                <motion.a
-                                    key={i} href={link.url} target={link.isPopup ? undefined : "_blank"}
+                                <motion.div
+                                    key={i} 
                                     onClick={(e) => {
-                                        if (link.isPopup) { e.preventDefault(); setShowHealthPopup(true); }
+                                        if (link.isPopup) { 
+                                            setShowHealthPopup(true); 
+                                        } else if (link.url.includes('drive.google.com') || link.url.includes('docs.google.com') || link.url.endsWith('.pdf')) {
+                                            setSelectedDocument({ url: link.url, label: link.title });
+                                        } else {
+                                            window.open(link.url, '_blank');
+                                        }
                                         logActivity('click_link', { contentTitle: 'Ecosystem Hub: ' + link.title });
                                     }}
                                     whileHover={{ y: -8, scale: 1.02 }}
-                                    className="premium-card p-8 group relative overflow-hidden flex flex-col items-center text-center hover:border-[#00B6C1]/30 transition-all border border-transparent bg-white shadow-xl"
+                                    className="premium-card p-8 group relative overflow-hidden flex flex-col items-center text-center hover:border-[#00B6C1]/30 transition-all border border-transparent bg-white shadow-xl cursor-pointer"
                                 >
                                     <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-xl transition-all group-hover:rotate-12" style={{ backgroundColor: `${link.color}15`, color: link.color }}>
                                         <link.icon size={28} />
                                     </div>
                                     <h4 className="text-xl font-serif font-bold text-[#0E5858] mb-2">{link.title}</h4>
                                     <p className="text-xs text-gray-400 leading-relaxed px-4 font-medium">{link.desc}</p>
-                                    <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] opacity-0 group-hover:opacity-100 transition-all">Launch Platform <ArrowRight size={14} /></div>
-                                </motion.a>
+                                    <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#00B6C1] opacity-0 group-hover:opacity-100 transition-all">
+                                        { (link.url.includes('drive.google.com') || link.url.includes('docs.google.com') || link.url.endsWith('.pdf')) ? 'View Dashboard' : 'Launch Platform' } <ArrowRight size={14} />
+                                    </div>
+                                </motion.div>
                             ))}
+                        </div>
+                    </section>
+                )
+            }
+
+            {
+                moduleId === 'module-4' && (
+                    <section className="mt-24 mb-10">
+                        <div className="flex items-center gap-6 mb-12">
+                            <div className="w-1.5 h-10 bg-purple-500 rounded-full"></div>
+                            <div>
+                                <h3 className="text-3xl font-serif text-[#0E5858]">Practical Implementation</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Simulated Practice & AI Viva</p>
+                            </div>
+                        </div>
+
+                        <div className="premium-card p-12 bg-gradient-to-br from-[#0E5858] to-[#00B6C1] rounded-[3.5rem] relative overflow-hidden group shadow-3xl">
+                            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-48 -mt-48"></div>
+                            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
+                                <div className="max-w-xl">
+                                    <h4 className="text-3xl font-serif text-white mb-4">Protocol Viva Simulation</h4>
+                                    <p className="text-white/70 text-lg leading-relaxed mb-8">
+                                        Practice your consultation pitch, objection handling, and client engagement with our AI client. This simulation is available at all times for you to refine your skills.
+                                    </p>
+                                    <div className="flex flex-wrap gap-4">
+                                        <button
+                                            onClick={() => setShowSimulation(true)}
+                                            className="px-10 py-5 bg-white text-[#0E5858] rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#FAFCEE] transition-all hover:-translate-y-1 shadow-2xl flex items-center gap-3"
+                                        >
+                                            <MessageCircle size={18} className="text-[#00B6C1]" />
+                                            Start Practice Session
+                                        </button>
+                                        <div className="px-6 py-5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex items-center gap-3">
+                                            <Sparkles size={18} className="text-[#B8E218]" />
+                                            <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">AI-Powered Feedback</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="hidden lg:block w-64 h-64 bg-white/10 backdrop-blur-3xl rounded-[3rem] border border-white/20 flex items-center justify-center rotate-12 group-hover:rotate-6 transition-transform duration-1000">
+                                    <BrainCircuit size={80} className="text-white opacity-40" />
+                                </div>
+                            </div>
                         </div>
                     </section>
                 )

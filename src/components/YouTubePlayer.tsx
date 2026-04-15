@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { logActivity } from '@/lib/activity';
 
 declare global {
@@ -19,19 +19,29 @@ interface YouTubePlayerProps {
 
 export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTitle }: YouTubePlayerProps) {
     const playerRef = useRef<any>(null);
-    const containerId = `youtube-player-${videoId}`;
+    // Use a stable, unique ID for this instance's container
+    const [instanceId] = useState(() => `yt-player-${Math.random().toString(36).substr(2, 9)}`);
+    const containerId = instanceId;
 
     useEffect(() => {
+        let isMounted = true;
+
         const checkYoutubeApi = () => {
             if (window.YT && window.YT.Player) {
-                createPlayer();
+                if (playerRef.current) {
+                    // Update existing player
+                    if (playerRef.current.loadVideoById) {
+                        playerRef.current.loadVideoById(videoId);
+                    }
+                } else {
+                    createPlayer();
+                }
                 return true;
             }
             return false;
         };
 
         if (!checkYoutubeApi()) {
-            // If the script isn't already there, add it
             if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
                 const tag = document.createElement('script');
                 tag.src = "https://www.youtube.com/iframe_api";
@@ -39,26 +49,26 @@ export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTit
                 firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
             }
 
-            // Polling approach to handle cases where multiple components load
-            // or when script is loading but window.onYouTubeIframeAPIReady is tricky
             const interval = setInterval(() => {
                 if (checkYoutubeApi()) {
                     clearInterval(interval);
                 }
             }, 100);
 
-            // Also keep the global callback for standard compliance
             const originalCallback = window.onYouTubeIframeAPIReady;
             window.onYouTubeIframeAPIReady = () => {
                 if (originalCallback) originalCallback();
-                checkYoutubeApi();
+                if (isMounted) checkYoutubeApi();
             };
 
-            return () => clearInterval(interval);
+            return () => {
+                isMounted = false;
+                clearInterval(interval);
+            };
         }
 
         function createPlayer() {
-            // Prevent duplicate initialization and error if container missing
+            if (!isMounted) return;
             const container = document.getElementById(containerId);
             if (!container || playerRef.current || !window.YT || !window.YT.Player) return;
 
@@ -92,11 +102,19 @@ export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTit
         }
 
         return () => {
-            if (playerRef.current) {
-                // playerRef.current.destroy(); // Optional: clean up if needed
+            isMounted = false;
+        };
+    }, [videoId, onComplete, topicCode, topicTitle]);
+
+    // Proper cleanup on unmount only
+    useEffect(() => {
+        return () => {
+            if (playerRef.current && playerRef.current.destroy) {
+                playerRef.current.destroy();
+                playerRef.current = null;
             }
         };
-    }, [videoId, onComplete]);
+    }, []);
 
     return (
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black">
@@ -104,3 +122,4 @@ export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTit
         </div>
     );
 }
+

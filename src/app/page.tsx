@@ -408,10 +408,10 @@ export default function Home() {
                   key={module.id}
                   whileHover={{ y: -8 }}
                   onClick={() => router.push(`/modules/${module.id}`)}
-                  className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-transparent hover:border-[#00B6C1]/20 transition-all cursor-pointer group flex flex-col justify-between min-h-[300px]"
+                  className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-transparent hover:border-[#00B6C1]/20 transition-all cursor-pointer group flex flex-col h-[340px]"
                 >
-                  <div>
-                    <div className="flex justify-between items-start mb-6">
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start mb-5">
                       <div className="w-14 h-14 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] group-hover:bg-[#0E5858] group-hover:text-white transition-all duration-500">
                         <BookOpen size={24} />
                       </div>
@@ -423,11 +423,11 @@ export default function Home() {
                     </div>
 
                     <h4 className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-2">Module {index + 1}</h4>
-                    <h3 className="text-xl font-serif text-[#0E5858] mb-4 group-hover:text-[#00B6C1] transition-colors">{module.title}</h3>
+                    <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">{module.title}</h3>
                     <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">{module.description}</p>
                   </div>
 
-                  <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between">
+                  <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-4 text-[10px] font-bold text-gray-300">
                       <span className="flex items-center gap-1.5">
                         <ListChecks size={12} />
@@ -441,6 +441,40 @@ export default function Home() {
                 </motion.div>
               );
             })}
+            
+            {/* Educator Hub Shortcut */}
+            <motion.div
+              whileHover={{ y: -8 }}
+              onClick={() => router.push(`/educators`)}
+              className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-transparent hover:border-[#00B6C1]/20 transition-all cursor-pointer group flex flex-col h-[340px]"
+            >
+              <div className="flex-1">
+                <div className="flex justify-between items-start mb-5">
+                  <div className="w-14 h-14 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] group-hover:bg-[#0E5858] group-hover:text-white transition-all duration-500">
+                    <Sparkles size={24} />
+                  </div>
+                  <div className="px-3 py-1 bg-[#0E5858] text-white rounded-full text-[8px] font-black uppercase tracking-widest border border-[#0E5858] flex items-center gap-1">
+                    NEW
+                  </div>
+                </div>
+
+                <h4 className="text-[10px] font-black text-[#0E5858] uppercase tracking-[0.3em] mb-2">Educators</h4>
+                <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">Educators Module</h3>
+                <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">Search across all videos, blogs, success stories, and protocols mapped to health conditions using our semantic engine.</p>
+              </div>
+
+              <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
+                <div className="flex items-center gap-4 text-[10px] font-bold text-[#00B6C1]">
+                  <span className="flex items-center gap-1.5">
+                    <Layers size={12} />
+                    RAG Search
+                  </span>
+                </div>
+                <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-[#00B6C1] group-hover:border-transparent group-hover:text-white transition-all">
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+            </motion.div>
           </div>
         </motion.section>
 

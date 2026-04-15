@@ -49,6 +49,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { syllabusData } from "@/data/syllabus";
+import ContentArchitect from "@/components/admin/ContentArchitect";
+import QuizProtocolEditor from "@/components/admin/QuizProtocolEditor";
+import AssetCentral from "@/components/admin/AssetCentral";
 
 interface Profile {
     id: string;
@@ -93,6 +96,16 @@ interface SummaryAudit {
     created_at: string;
 }
 
+interface SimulationLog {
+    id: string;
+    user_id: string;
+    topic_code: string;
+    chat_history: any[];
+    rating?: number;
+    admin_feedback?: string;
+    created_at: string;
+}
+
 const TOTAL_SYLLABUS_TOPICS = syllabusData
     .filter(m => m.id !== 'resource-bank')
     .reduce((acc, mod) => acc + mod.topics.length, 0);
@@ -125,6 +138,7 @@ function AdminDashboardContent() {
     const [audits, setAudits] = useState<SummaryAudit[]>([]);
     const [dynamicContent, setDynamicContent] = useState<DynamicContent[]>([]);
     const [progress, setProgress] = useState<TopicProgress[]>([]);
+    const [simulationLogs, setSimulationLogs] = useState<SimulationLog[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
     // Detail Views
@@ -158,6 +172,8 @@ function AdminDashboardContent() {
         topicTitle: "",
         contentType: "video",
         contentLink: "",
+        folder: "",
+        tags: "",
     });
     const [uploadingContent, setUploadingContent] = useState(false);
     const [contentSuccess, setContentSuccess] = useState("");
@@ -208,35 +224,173 @@ function AdminDashboardContent() {
 
     const refreshData = async () => {
         try {
-            const [
-                { data: pData },
-                { data: aData },
-                { data: actData },
-                { data: audData },
-                { data: cData },
-                { data: prData }
-            ] = await Promise.all([
-                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-                supabase.from('assessment_logs').select('*').order('created_at', { ascending: false }),
-                supabase.from('mentor_activity_logs').select('*').order('created_at', { ascending: false }),
-                supabase.from('summary_audits').select('*').order('created_at', { ascending: false }),
-                supabase.from('syllabus_content').select('*').order('module_id', { ascending: true }),
-                supabase.from('mentor_progress').select('*')
-            ]);
+            console.log("Master Sync Started...");
 
-            setProfiles(pData || []);
-            setAssessments(aData || []);
-            setActivity(actData || []);
+            // Get current session and user role first to know how to filter
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const { data: userProfile } = await supabase
+                .from('profiles')
+                .select('role, email')
+                .eq('id', session.user.id)
+                .single();
+
+            const isTrainerBuddy = userProfile?.role === 'trainer buddy';
+            const userEmail = userProfile?.email;
+
+            // Optional: Pull in latest metadata from Auth for orphaned profiles or missing fields
+            if (!hasSyncedRegistry.current && !isTrainerBuddy) {
+                try {
+                    const syncRes = await fetch('/api/admin/sync-registry', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        }
+                    });
+                    if (syncRes.ok) {
+                        hasSyncedRegistry.current = true;
+                        console.log("Master Registry Synchronized successfully.");
+                    }
+                } catch (e) {
+                    console.warn("Auto-Sync skipped:", e);
+                }
+            }
+
+            const fetchRes = await fetch('/api/admin/dashboard-sync', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            if (!fetchRes.ok) {
+                console.error("Master Sync API failed", await fetchRes.text());
+                return;
+            }
+
+            const masterData = await fetchRes.json();
+            const pData = masterData.profiles;
+            const aData = masterData.assessments;
+            const actData = masterData.activities;
+            const audData = masterData.audits;
+            const cData = masterData.syllabus;
+            const prData = masterData.progress;
+            const simData = masterData.simulations;
+
+            const pError = null;
+            const prError = null;
+
+            if (pError) console.error("Profiles error:", pError);
+            if (prError) console.error("Progress error:", prError);
+
+            let filteredProfiles = pData || [];
+            if (isTrainerBuddy && userEmail) {
+                console.log("[Buddy Filter] Trainer buddy email:", userEmail, "| Total profiles:", pData?.length);
+                filteredProfiles = (pData || []).filter(p => {
+                    try {
+                        const buddies = JSON.parse(p.training_buddy || '[]');
+                        const buddiesArray = Array.isArray(buddies) ? buddies : [buddies];
+                        const match = buddiesArray.some((b: any) => b.email?.toLowerCase() === userEmail.toLowerCase());
+                        if (match) console.log("[Buddy Filter] MATCHED:", p.email, p.full_name);
+                        return match;
+                    } catch (e) {
+                        // Fallback for comma separated legacy data
+                        return p.training_buddy?.toLowerCase().includes(userEmail.toLowerCase());
+                    }
+                });
+                console.log("[Buddy Filter] Filtered counsellors count:", filteredProfiles.length);
+            }
+
+            const allowedUserIds = new Set(filteredProfiles.map(p => p.id));
+
+            const filteredAssessments = (aData || []).filter(a => allowedUserIds.has(a.user_id));
+            const filteredActivityLogs = (actData || []).filter(act => allowedUserIds.has(act.user_id));
+            const filteredAudits = (audData || []).filter(aud => allowedUserIds.has(aud.user_id));
+            const filteredProgress = (prData || []).filter(pr => allowedUserIds.has(pr.user_id));
+
+            // Create a unified activity feed by merging logs, assessments, and progress
+            const combinedActivity = [
+                ...filteredActivityLogs,
+                ...filteredAssessments.map(a => {
+                    // Try to find title in syllabus
+                    let title = a.topic_code;
+                    for (const mod of syllabusData) {
+                        if (a.topic_code === `MODULE_${mod.id}`) title = mod.title;
+                        const t = mod.topics?.find(top => top.code === a.topic_code);
+                        if (t) title = t.title;
+                    }
+                    return {
+                        id: `assessment-${a.id}`,
+                        user_id: a.user_id,
+                        activity_type: a.topic_code?.startsWith('MODULE_') ? 'complete_module' : 'complete_quiz',
+                        content_title: title,
+                        topic_code: a.topic_code,
+                        created_at: a.created_at,
+                        score: a.score
+                    };
+                }),
+                ...filteredProgress.map(p => {
+                    // Find topic title
+                    let title = p.topic_code;
+                    const mod = syllabusData.find(m => m.id === p.module_id);
+                    if (mod) {
+                        const t = mod.topics?.find(top => top.code === p.topic_code);
+                        if (t) title = t.title;
+                    }
+                    return {
+                        id: `progress-${p.user_id}-${p.topic_code}`,
+                        user_id: p.user_id,
+                        activity_type: 'complete_segment',
+                        content_title: title,
+                        topic_code: p.topic_code,
+                        created_at: p.completed_at || p.created_at || new Date().toISOString()
+                    };
+                })
+            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            const uniqueActivity: ActivityLog[] = [];
+            const seen = new Set();
+            combinedActivity.forEach(act => {
+                const key = `${act.user_id}-${act.topic_code || act.content_title}-${act.activity_type}`;
+                if (!seen.has(key)) {
+                    uniqueActivity.push(act as ActivityLog);
+                    seen.add(key);
+                }
+            });
+
+            setProfiles(filteredProfiles);
+            setAssessments(filteredAssessments);
+            setActivity(uniqueActivity);
             setAudits(audData || []);
             setDynamicContent(cData || []);
             setProgress(prData || []);
+            setSimulationLogs(simData || []);
+            console.log("Master Sync Complete. Profiles:", filteredProfiles.length, "Activity:", uniqueActivity.length);
         } catch (err) {
             console.error("Master Sync Error:", err);
         }
     };
 
-    const counsellors = useMemo(() => profiles.filter(p => p.role === 'counsellor'), [profiles]);
+
+    const counsellors = useMemo(() => profiles.filter(p => p.role === 'counsellor' || p.role === 'mentor'), [profiles]);
     const buddies = useMemo(() => profiles.filter(p => p.role === 'moderator' || p.role === 'admin'), [profiles]);
+
+    const dbFolders = useMemo(() =>
+        dynamicContent
+            .filter(d => d.content_type === 'folder')
+            .map(d => ({ id: d.id, name: d.title, prefix: d.content }))
+    , [dynamicContent]);
+
+    const customFolders = useMemo(() => {
+        return [...dbFolders];
+    }, [dbFolders]);
+
+    // Content entries only (exclude folder config rows)
+    const contentOnlyEntries = useMemo(() =>
+        dynamicContent.filter(d => d.content_type !== 'folder')
+    , [dynamicContent]);
 
     const filteredRegistry = useMemo(() => {
         return profiles.filter(p =>
@@ -307,7 +461,7 @@ function AdminDashboardContent() {
             if (!response.ok) throw new Error('Architecture synchronization failed');
 
             setContentSuccess("Content Bank synchronized across all nodes.");
-            setContentForm({ moduleId: "", topicTitle: "", contentType: "video", contentLink: "" });
+            setContentForm({ id: "", topicCode: "", moduleId: "", topicTitle: "", contentType: "video", contentLink: "", folder: "", tags: "" });
             refreshData();
         } catch (err: any) {
             setContentError(err.message);
@@ -892,8 +1046,80 @@ function AdminDashboardContent() {
                                                 </div>
                                             </div>
                                         ))}
-                                        {audits.filter(a => a.user_id === selectedProfile.id).length === 0 && (
-                                            <p className="text-center py-10 text-[10px] font-black text-gray-300 uppercase tracking-widest">No audits logged yet</p>
+                                    </div>
+                                </div>
+
+                                {/* Simulation Training Review */}
+                                <div className="bg-white p-10 rounded-[3rem] border border-[#0E5858]/5">
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-[#0E5858]/40 mb-8 flex items-center gap-3">
+                                        <MessageSquare size={16} className="text-[#00B6C1]" /> Simulated Client Training Logs
+                                    </h4>
+                                    <div className="space-y-6">
+                                        {simulationLogs.filter(s => s.user_id === selectedProfile.id).length > 0 ? (
+                                            simulationLogs.filter(s => s.user_id === selectedProfile.id).map(log => (
+                                                <div key={log.id} className="p-8 bg-gray-50/50 rounded-[2.5rem] border border-[#0E5858]/5">
+                                                    <div className="flex flex-col md:flex-row justify-between gap-6 mb-6">
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-[#00B6C1] uppercase tracking-widest">Simulation: {log.topic_code}</p>
+                                                            <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mt-0.5">{new Date(log.created_at).toLocaleString()}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center bg-white px-4 py-2 rounded-xl shadow-sm border border-[#0E5858]/5">
+                                                                {[1, 2, 3, 4, 5].map(star => (
+                                                                    <button
+                                                                        key={star}
+                                                                        onClick={async () => {
+                                                                            const { error } = await supabase.from('simulation_logs').update({ rating: star }).eq('id', log.id);
+                                                                            if (!error) refreshData();
+                                                                        }}
+                                                                        className={`p-1 transition-colors ${log.rating && log.rating >= star ? 'text-[#FFCC00]' : 'text-gray-200 hover:text-[#FFCC00]/50'}`}
+                                                                    >
+                                                                        <Star size={16} fill={log.rating && log.rating >= star ? "currentColor" : "none"} />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Chat Transcript Preview */}
+                                                    <div className="p-6 bg-white rounded-2xl border border-gray-100 mb-6 max-h-60 overflow-y-auto custom-scrollbar">
+                                                        <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-4">Chat Transcript</p>
+                                                        <div className="space-y-4">
+                                                            {log.chat_history?.map((msg: any, mIdx: number) => (
+                                                                <div key={mIdx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                                    <div className={`max-w-[80%] p-3 rounded-xl text-[10px] leading-relaxed ${msg.role === 'user' ? 'bg-[#FAFCEE] text-[#0E5858] font-bold' : 'bg-[#0E5858] text-white'}`}>
+                                                                        {msg.content}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Review Note Box */}
+                                                    <div className="space-y-3">
+                                                        <label className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest ml-4">Trainer Review Note (Founders Note)</label>
+                                                        <div className="flex gap-3">
+                                                            <textarea
+                                                                defaultValue={log.admin_feedback || ""}
+                                                                onBlur={async (e) => {
+                                                                    const val = e.target.value;
+                                                                    if (val === log.admin_feedback) return;
+                                                                    const { error } = await supabase.from('simulation_logs').update({ admin_feedback: val }).eq('id', log.id);
+                                                                    if (!error) {
+                                                                        setContentSuccess("Feedback synchronized.");
+                                                                        setTimeout(() => setContentSuccess(""), 2000);
+                                                                        refreshData();
+                                                                    }
+                                                                }}
+                                                                placeholder="Add feedback for the mentor..."
+                                                                className="flex-1 bg-white border border-gray-100 rounded-2xl py-3 px-6 text-[11px] font-medium outline-none resize-none h-20 shadow-sm focus:ring-2 focus:ring-[#00B6C1]/10 transition-all italic"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-center py-10 text-[10px] font-black text-gray-300 uppercase tracking-widest">No simulation attempts recorded</p>
                                         )}
                                     </div>
                                 </div>
@@ -1130,35 +1356,55 @@ function AdminDashboardContent() {
                             <p className="text-gray-400 font-medium mt-3 italic text-sm">Synchronize resources across the academy.</p>
                         </header>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <div className="bg-[#FAFCEE] p-10 rounded-[2rem] shadow-sm border border-[#0E5858]/10 flex flex-col items-center justify-center text-center space-y-4">
-                                <ShieldCheck size={48} className="text-[#00B6C1]/40" />
-                                <div>
-                                    <h3 className="text-xl font-serif text-[#0E5858]">Content Upload: Phase 2</h3>
-                                    <p className="text-xs text-gray-500 font-medium leading-relaxed max-w-[250px] mt-2">
-                                        Dynamic syllabus updates and resource injection are scheduled for the next major release.
-                                    </p>
-                                </div>
-                            </div>
+                        {/* Folder Management Bar */}
+                        <AssetCentral 
+                            customFolders={customFolders}
+                            renamingFolderId={renamingFolderId}
+                            setRenamingFolderId={setRenamingFolderId}
+                            renameFolderValue={renameFolderValue}
+                            setRenameFolderValue={setRenameFolderValue}
+                            newFolderName={newFolderName}
+                            setNewFolderName={setNewFolderName}
+                            newFolderPrefix={newFolderPrefix}
+                            setNewFolderPrefix={setNewFolderPrefix}
+                            handleCreateFolder={handleCreateFolder}
+                            handleRenameFolder={handleRenameFolder}
+                            handleDeleteFolder={handleDeleteFolder}
+                        />
 
+                        <div className="space-y-12">
+                            <ContentArchitect 
+                                contentForm={contentForm}
+                                setContentForm={setContentForm}
+                                syllabusData={syllabusData}
+                                customFolders={customFolders}
+                                uploadingContent={uploadingContent}
+                                contentError={contentError}
+                                contentSuccess={contentSuccess}
+                                handleUpdateContent={handleUpdateContent}
+                                contentOnlyEntries={contentOnlyEntries}
+                                detectFolderFromCode={detectFolderFromCode}
+                                handleDeleteContent={handleDeleteContent}
+                            />
 
-                            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-[#0E5858]/5 overflow-hidden flex flex-col max-h-[500px]">
-                                <h3 className="text-xl font-serif text-[#0E5858] mb-6">Active Resource Nodes</h3>
-                                <div className="space-y-3 overflow-y-auto pr-2 scrollbar-hide">
-                                    {dynamicContent.map(content => (
-                                        <div key={content.id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 flex items-center justify-between group">
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-[#0E5858] truncate">{content.title}</p>
-                                                <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">{content.module_id}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <a href={content.content} target="_blank" className="p-2 text-gray-300 hover:text-[#00B6C1] transition-all"><ExternalLink size={12} /></a>
-                                                <button onClick={() => handleDeleteContent(content.id)} className="p-2 text-gray-300 hover:text-red-500 transition-all"><Trash2 size={12} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <QuizProtocolEditor 
+                                selectedQuizTopic={selectedQuizTopic}
+                                setSelectedQuizTopic={setSelectedQuizTopic}
+                                syllabusData={syllabusData}
+                                isFetchingQuiz={isFetchingQuiz}
+                                handleFetchManualQuiz={handleFetchManualQuiz}
+                                customAIPrompt={customAIPrompt}
+                                setCustomAIPrompt={setCustomAIPrompt}
+                                handleGenerateAISuggestions={handleGenerateAISuggestions}
+                                isGeneratingSuggestions={isGeneratingSuggestions}
+                                manualQuizQuestions={manualQuizQuestions}
+                                setManualQuizQuestions={setManualQuizQuestions}
+                                handleSaveManualQuiz={handleSaveManualQuiz}
+                                handleDeleteManualQuiz={handleDeleteManualQuiz}
+                                isSavingQuiz={isSavingQuiz}
+                                quizSuccess={quizSuccess}
+                                quizError={quizError}
+                            />
                         </div>
                     </motion.div>
                 ) : (

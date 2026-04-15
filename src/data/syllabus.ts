@@ -25,12 +25,14 @@ export interface Topic {
     isAssignment?: boolean;
     assignmentQuestions?: string[];
     caseStudyLinks?: string[];
+    caseStudies?: { label: string; url: string; thumbnail?: string }[];
     persona?: { story: string; goal: string };
-    links?: { label: string; url: string; subtitle?: string; icon?: string; isPopup?: boolean }[];
+    links?: { label: string; url: string; subtitle?: string; icon?: string; isPopup?: boolean; subLinks?: { label: string; url: string }[] }[];
     layout?: 'default' | 'grid';
     isBooking?: boolean;
     bookingUrl?: string;
     isDynamic?: boolean;
+    isAccordion?: boolean;
     sort_order?: number;
 }
 
@@ -66,15 +68,15 @@ export const syllabusData: Module[] = [
                 content: 'Study the core platform to understand the client interface.',
                 layout: 'grid',
                 links: [
-                    { label: 'BN Website', url: 'https://www.balancenutrition.in/' },
-                    { label: 'BN Cleanse', url: 'https://bncleanse.com/' },
-                    { label: 'BN Recipes', icon: 'target', url: 'https://www.balancenutrition.in/recipes' },
-                    { label: 'BN Health Score', icon: 'activity', url: 'https://www.balancenutrition.in/health-score' },
-                    { label: 'BN Health Reads', icon: 'globe', url: 'https://www.balancenutrition.in/health-reads' }
+                    { label: 'BN Website', url: 'https://www.balancenutrition.in/', subtitle: 'Explore our main platform where clients book programs and track their health journey.' },
+                    { label: 'BN Cleanse', url: 'https://bncleanse.com/', subtitle: 'Our specialized detox and cleanse program platform for rapid health resets.' },
+                    { label: 'BN Recipes', icon: 'target', url: 'https://www.balancenutrition.in/recipes', subtitle: 'A database of nutritionist-approved recipes provided to all clients.' },
+                    { label: 'BN Health Score', icon: 'activity', url: 'https://www.balancenutrition.in/health-score', subtitle: 'The core diagnostic tool used to quantify and monitor client health status.' },
+                    { label: 'BN Health Reads', icon: 'globe', url: 'https://www.balancenutrition.in/health-reads', subtitle: 'Educational blog and research articles for client knowledge and engagement.' },
+                    { label: 'BN Program Catalogue', url: '/documents/BN_PROGRAM_CATALOGUE.pdf', icon: 'file-text', subtitle: 'Our complete program catalogue and pricing strategy.' },
+                    { label: 'BN Product Catalogue', url: '/documents/BN_SHOP_PRODUCT_CATALOGUE.pdf', icon: 'file-text', subtitle: 'Overview of all proprietary BN physical products and supplements.' }
                 ]
             },
-
-
             {
                 code: 'M1-02',
                 title: 'Meet Our Founders',
@@ -88,19 +90,17 @@ export const syllabusData: Module[] = [
             {
                 code: 'M1-03',
                 title: 'Social Media Assessment',
-                content: 'Study all official channels. <strong>Action:</strong> Review links and note down key takeaways and feedback.<br/><br/> ',
+                content: 'Study all official channels. Click an ID to copy it for quick search on your phone.<br/><br/> ',
+                layout: 'grid',
                 links: [
-                    { label: 'Instagram BN', url: 'https://instagram.com/balancenutrition.in?igshid=YmMyMTA2M2Y=' },
-                    { label: 'Instagram Khyati', url: 'https://instagram.com/nutritionist_khyatirupani?igshid=YmMyMTA2M2Y=' },
+                    { label: 'Instagram @balancenutrition.in', url: 'balancenutrition.in', icon: 'instagram', isCopyOnly: true },
+                    { label: 'Instagram @nutritionwithkhyati', url: 'nutritionwithkhyati', icon: 'instagram', isCopyOnly: true },
                     { label: 'LinkedIn BN', url: 'https://www.linkedin.com/company/balance-nutrition-weight-loss-&-more/' },
                     { label: 'LinkedIn Khyati', url: 'https://www.linkedin.com/in/nutritionistkhyatirupani' },
-                    { label: 'LinkedIn Vishal', url: 'https://www.linkedin.com/in/vishal-rupani-501a3b4' },
                     { label: 'YouTube', url: 'https://youtube.com/c/BalanceNutrition' },
-                    { label: 'Facebook', url: 'https://www.facebook.com/khyati.rupani.3?mibextid=wwXIfr&rdid=lTKV6HvWFUEJtJwX&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F16re8LMXsv%2F%3Fmibextid%3DwwXIfr#' }
+                    { label: 'Facebook', url: 'https://www.facebook.com/khyati.rupani.3?mibextid=wwXIfr' }
                 ]
-            },
-
-
+            }
         ]
     },
 
@@ -120,9 +120,10 @@ export const syllabusData: Module[] = [
                 code: 'M2-01',
                 title: 'How We Work',
                 content: 'Video explaining the complete client journey from purchase to completion.',
-                links: [{ label: 'How We Work Video', url: 'https://youtu.be/WpaY3G9RGyY' },
-                { label: 'Glossary', url: 'https://docs.google.com/spreadsheets/d/1gemc5b7d-UsGNfIoQTGuh2FkslabYmPmp_ybznjxGSA/edit?gid=1915602987#gid=1915602987' },
-                { label: 'BN Statistics', url: 'https://docs.google.com/spreadsheets/d/195nuyHuXtRsprI97R6x1sp_kKWxfCh_jXEdpyz846a8/edit?usp=sharing' }
+                links: [
+                    { label: 'How We Work Video', url: 'https://youtu.be/WpaY3G9RGyY' },
+                    { label: 'Glossary', url: 'https://docs.google.com/spreadsheets/d/1gemc5b7d-UsGNfIoQTGuh2FkslabYmPmp_ybznjxGSA/edit?gid=1915602987#gid=1915602987' },
+                    { label: 'BN Statistics', url: 'https://docs.google.com/spreadsheets/d/195nuyHuXtRsprI97R6x1sp_kKWxfCh_jXEdpyz846a8/edit?usp=sharing', subtitle: 'These are company numbers used to build authority and trust during consultation calls.' }
                 ]
             },
             {
@@ -130,20 +131,32 @@ export const syllabusData: Module[] = [
                 title: 'Awards and Recognition',
                 content: 'Explore the international accolades, media features, and brand milestones of Balance Nutrition.',
                 links: [
-
                     { label: "Vishal Sir's BTVI Interview", url: 'https://www.youtube.com/watch?v=slBpy4wPX5g&t=8s' },
                     { label: 'Media-Awards-Recognition', url: 'https://www.youtube.com/watch?v=VPrT-yRt9v8#action=share' }
                 ]
             },
-
             {
                 code: 'M2-03',
                 title: 'Program Training',
-                content: 'Overview of all BN medical and lifestyle programs. Study the program structures and health inclusions.',
+                content: 'Select a program from the dropdown below to explore its structure and protocols.',
+                isAccordion: true,
                 links: [
-                    { label: 'Program Training Recording', url: 'https://us06web.zoom.us/rec/play/LEleYRJJTdk9jVOq1fdRn_-bSxcuczslgg-O4I2BlSLSIJaod7wq2lOYjygnCtzVxS__bNi_HZFMhF-G.ciquqYqkwaewWofq?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2F2eBla490EonzMCtdEFEACKWff_wcSIm7L-Xea2Tjs6YKJtCyCO61C1D7HkOhCEMi.91w22q29HVh6aMvb' },
-                    { label: 'All Programs', url: 'https://docs.google.com/document/d/1QAmIPw-wfDOOioYe8pA5-aX-jvookekLTsbvHEjCEb4/edit?usp=sharing' },
-                    { label: 'BN Program Pricing', url: 'https://docs.google.com/spreadsheets/d/1yVzsEmaW87XIuinrsP8akuoXfozx1hrmUfd6_me5RLs/edit?gid=954871707#gid=954871707' },
+                    {
+                        label: 'Program Training Recording',
+                        url: 'https://us06web.zoom.us/rec/play/LEleYRJJTdk9jVOq1fdRn_-bSxcuczslgg-O4I2BlSLSIJaod7wq2lOYjygnCtzVxS__bNi_HZFMhF-G.ciquqYqkwaewWofq?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2F2eBla490EonzMCtdEFEACKWff_wcSIm7L-Xea2Tjs6YKJtCyCO61C1D7HkOhCEMi.91w22q29HVh6aMvb',
+                        subLinks: [
+                            { label: 'Weight Loss Pro Program', url: 'https://www.youtube.com/watch?v=3zx6UDOJW10' },
+                            { label: 'Weight Loss Plus Program', url: 'https://www.youtube.com/watch?v=Pjh66SSPRpg' },
+                            { label: 'Beat PCOS Program', url: 'https://youtu.be/LIrccmmw65k' },
+                            { label: 'Slim Smart 30', url: 'https://youtu.be/4U56FpjvteM' },
+                            { label: 'Renue Program', url: 'https://youtu.be/FXBqPTEqEVU' },
+                            { label: 'Body Transformation Program', url: 'https://www.youtube.com/watch?v=vtLWQ9HI18U' },
+                            { label: 'Plateau Breaker Program', url: 'https://www.youtube.com/watch?v=Ex1d94x7b-A' },
+                            { label: 'Active Weight Loss Program', url: 'https://www.youtube.com/watch?v=orIp1QRR6u0' },
+                            { label: 'Reform Intermittent Fasting', url: 'https://youtu.be/tk3o_PuqASw' },
+                            { label: 'Slimpossible 60 Program', url: 'https://youtu.be/1098FRtg9ZQ' }
+                        ]
+                    }
                 ]
             },
             {
@@ -152,34 +165,33 @@ export const syllabusData: Module[] = [
                 content: 'Deep dive into the specific kits and lifestyle guides provided to clients.',
                 links: [
                     { label: 'E-Kits Ecosystem', url: 'https://www.youtube.com/watch?v=lCbJs_FYueQ&t=444s' },
-                    { label: 'Eating Portions', url: 'https://balancenutrition.in/media/ekits/eat_in_portions.pdf' },
-                    { label: 'Alcohol Guide', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759304799/app_images/ubegnn0cfmzazh7u15ay.mp4' },
-                    { label: 'Restaurant Guide', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759303713/app_images/rt24vbelaswemhdbessr.mp4' },
-                    { label: 'Quick Filler', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759304944/app_images/tetgjgq3lilyo5enwmaz.mp4' },
-
+                    { label: 'App Feature - Alcohol Guide', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759304799/app_images/ubegnn0cfmzazh7u15ay.mp4' },
+                    { label: 'App Feature - Restaurant Guide', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759303713/app_images/rt24vbelaswemhdbessr.mp4' },
+                    { label: 'App Feature - Quick Filler', url: 'https://res.cloudinary.com/dg4wzx8c8/video/upload/v1759304944/app_images/tetgjgq3lilyo5enwmaz.mp4' },
+                    { label: 'BN Guide - Eating Portions', url: 'https://balancenutrition.in/media/ekits/eat_in_portions.pdf' }
                 ]
             },
             {
                 code: 'M2-05',
                 title: 'Peer Review',
-                content: 'Conduct a commercial and comparative audit of Balance Nutrition versus market peers.<br/><br/><strong>Objective:</strong> To understand how Balance Nutrition stands against key market competitors in terms of approach, sales pitching, and digital presence.<br/><br/><strong>Instructions:</strong><br/>1. Create Your persona: Using the example below, define your own age, weight and goal for this audit.<br/>2. Select 2 Peer Companies & 2 Peer Dietitians to audit alongside <strong>Balance Nutrition</strong> and <strong>Khyati Rupani</strong>.<br/>3. Conduct the research and fill the audit columns.</br><br/> <strong>Note:</strong> You can complete the peer review by the end of training, but initiate the process of booking consultation call with BN competitors as soon as possible.</b><b>remember to keep your created persona as the person you are auditing for.</b><b>',
+        content: 'Conduct a commercial and comparative audit of Balance Nutrition versus market peers.<br/><br/><strong>Objective:</strong> To understand how Balance Nutrition stands against key market competitors in terms of approach, sales pitching, and digital presence.<br/><br/><strong>Instructions:</strong><br/>1. Create Your persona: Using the example below, define your own age, weight and goal for this audit.<br/>2. Select 2 Peer Companies & 2 Peer Dietitians to audit alongside <strong>Balance Nutrition</strong> and <strong>Khyati Rupani</strong>.<br/>3. Conduct the research and fill the audit columns.</br><br/> <strong>Note:</strong> You can complete the peer review by the end of training, but initiate the process of booking consultation call with BN competitors as soon as possible.</b><b>remember to keep your created persona as the person you are auditing for.</b><b>',
                 isAssignment: true,
                 persona: {
                     story: "Example: I am 35 years old, 5'6\" tall, and weigh 230 lbs. I have been overweight for a long time but don’t have any health problems.",
                     goal: "Lose weight and get rid of my obesity."
                 },
                 assignmentQuestions: [
-                    "Lead Capture & Enquiries:Where and How was the initial enquiry process (Website/WhatsApp/Social Media)?",
-                    "Speed of Activation: How long did it take for the first response and what was the mode of contact?",
-                    "First Impression call: Evaluate the tone, energy, and professionalism of the very first 'Activation Call'.",
-                    "Health Discovery: Did the counselor deep-dive into your medical history and lifestyle, or was it a generic pitch?",
-                    "Problem-to-Solution Transition: How effectively did they link your health goals to their specific program features?",
-                    "Program Pitching Quality: Evaluate the confidence and clarity during the program recommendation.",
-                    "Pricing Strategy: How was the pricing introduced? Was there 'Limited Time' pressure or genuine value building?",
-                    "Objection Handling: How did they manage your concerns about cost, duration, or previous failed attempts?",
-                    "With complete unbiased opinion — which company would you purchase your health program from and why?",
-                    "Digital Content Quality: Analyze the scientific vs promotional balance of their social media content.",
-                    "Relatability & Trust: Who felt more authentic, approachable, and trustworthy in their digital presence?"
+                    "Lead Capture & Enquiries: Where and How was the initial enquiry process?",
+                    "Speed of Activation: How long did it take for the first response?",
+                    "First Impression call: Evaluate the tone, energy, and professionalism.",
+                    "Health Discovery: Did the counselor deep-dive into your history?",
+                    "Problem-to-Solution Transition: How effectively did they link goals to features?",
+                    "Program Pitching Quality: Evaluate confidence and clarity.",
+                    "Pricing Strategy: How was pricing introduced?",
+                    "Objection Handling: How did they manage concerns?",
+                    "Which company would you purchase from and why?",
+                    "Digital Content Quality: Analyze scientific vs promotional balance.",
+                    "Relatability & Trust: Who felt more authentic?"
                 ],
                 links: [
                     { label: 'Healthify Me', url: 'https://www.healthifyme.com/' },
@@ -197,9 +209,7 @@ export const syllabusData: Module[] = [
         ]
     },
 
-
-
-    // ===== MODULE 4: Consultation Training (Shifted from M3) =====
+    // ===== MODULE 3: Consultation Training =====
     {
         id: 'module-3',
         title: 'Module 3: Consultation Training',
@@ -213,66 +223,96 @@ export const syllabusData: Module[] = [
         topics: [
             {
                 code: 'M3-01',
-                title: 'Consultation Calls by Counsellors',
+                title: 'Training by Counsellors',
                 content: 'Observe live calls by senior counsellors and understand call etiquette.',
+                isAccordion: true,
                 links: [
-                    { label: 'Khyati Consultation Call', url: 'https://drive.google.com/drive/u/0/folders/1no3Bzra5O3CqdDQqhOUuetrNhbAcsXNc' },
-                    { label: 'Live Calls Drive', url: 'https://drive.google.com/drive/folders/1gGNjm008rEY6MoiF8hZze5t1LMkK6LpU' }
+                    {
+                        label: 'Objection Handling by Khyati Maam',
+                        url: 'https://drive.google.com/drive/folders/1IOYPqCpUsC6iwQOdQKx1TcfDJjhGvJCo?usp=sharing',
+                        subLinks: [
+                            { label: "Body composition on online plan", url: "https://drive.google.com/file/d/1rCb8l6tV_lyjaY5PSC_BGrjgvyCXJ1p0/view?usp=drive_link" },
+                            { label: "Cancer Patient", url: "https://drive.google.com/file/d/1Ys5LFeHMoYhTIkTwd-1-6XgrhWpnNvTL/view?usp=drive_link" },
+                            { label: "Daily essential", url: "https://drive.google.com/file/d/1exR0Wjzse1zlNQZ8tcyvztzlbZLtfok0/view?usp=drive_link" },
+                            { label: "NRI Ingredient and food choices", url: "https://drive.google.com/file/d/1gIYaZxbwAA4fBIduqqwID8XhmidaGlrJ/view?usp=drive_link" },
+                            { label: "Miscarriage", url: "https://drive.google.com/file/d/1UL6gm5ku1w3FOfwr5LZAgAWCtT7gt2k6/view?usp=drive_link" },
+                            { label: "What kind of diet we give", url: "https://drive.google.com/file/d/1PcL8bsb7oWG9wo2btjXvb7rY3jAPPeRU/view?usp=drive_link" },
+                            { label: "Post pregnancy weight loss", url: "https://drive.google.com/file/d/1N84VHBUetPph8cCnrS6FmSTuEtOVN3Ws/view?usp=drive_link" },
+                            { label: "Why no call", url: "https://drive.google.com/file/d/1342O5QtmaK8vvSGWVWSECL1VboYa2qJE/view?usp=drive_link" },
+                            { label: "Sample diet", url: "https://drive.google.com/file/d/1-yiUiwqfkrWfDy6UhScAM9ijKkdopWYi/view?usp=drive_link" },
+                            { label: "How much weight loss", url: "https://drive.google.com/file/d/1IpbQszQ_rUFy7yPs4R3lqkR1G238J4Jl/view?usp=drive_link" },
+                            { label: "Intermittent Fasting", url: "https://drive.google.com/file/d/13GEkIalbliVndPzFwoOvTrymqahUwqL3/view?usp=drive_link" },
+                            { label: "Guarantee weight loss", url: "https://drive.google.com/file/d/1oKbMxnmnu1aX17dV_RVCOUACn1Kfnyno/view?usp=drive_link" },
+                            { label: "Restaurant guide", url: "https://drive.google.com/file/d/1-uqfwNh7CqTnIzuw4da-eoX0hTUhp5tx/view?usp=drive_link" }
+                        ]
+                    },
+                    {
+                        label: 'Consultation Calls',
+                        url: 'https://drive.google.com/drive/folders/1HuBQpNCYUjEzpSKqS7p1inMx_Xf1O-mK?usp=sharing',
+                        subLinks: [
+                            { label: "Basic of consultation", url: "https://drive.google.com/file/d/1Y3sOOowdJzAKxHeXXfISaoiXwy53uM9-/view?usp=drive_link" },
+                            { label: "Khyati Ma'am welcome call", url: "https://drive.google.com/file/d/1bqRhCkpWPgN-_Q4QT0ecPRZZQNoV3qKD/view?usp=drive_link" },
+                            { label: "Kajal Consultation call record", url: "https://drive.google.com/file/d/17Tcs4VzqTWdDoptkVrwipLbu1MXPtPAE/view?usp=drive_link" },
+                            { label: "Nazneen consultation call record 2", url: "https://drive.google.com/file/d/1A7QM95lBgXKdrq7xhudtMQtFfG6Uz5hX/view?usp=sharing" },
+                            { label: "Mithila Lead consultation call", url: "https://drive.google.com/file/d/1E96Drw4ObRWEjGAQFP72QdWyVsoqJNyU/view?usp=drive_link" },
+                            { label: "Urmila consultation call record 2", url: "https://drive.google.com/file/d/1FVcZ2SWM9WCBmiQqwdKOP4eMEerIYzAg/view?usp=drive_link" },
+                            { label: "Palak Consultation call recording", url: "https://drive.google.com/file/d/1_jgau6SiDSNfxqJWx8ohtL6P_K4dnwhF/view?usp=drive_link" },
+                            { label: "Urmila consultation call record 1", url: "https://drive.google.com/file/d/1ezm4zSnBNZFVXBpV_EkGyQJ--03zxjys/view?usp=drive_link" },
+                            { label: "Nazneen consultation call record 1", url: "https://drive.google.com/file/d/1jzQxgwzuszvuWaTpqLokks9riIdqm-6w/view?usp=drive_link" }
+                        ]
+                    }
                 ]
             },
-
             {
                 code: 'M3-02',
                 title: 'Day-to-Day Lead Engagement',
                 content: 'Strategies for daily client engagement, motivation, and milestone tracking.',
                 links: [
-                    { label: 'Engagement Guide', url: 'https://drive.google.com/file/d/1mrrNxIUOXRKXPVYZsDYvf64fp-8gbOS2/view?usp=sharing' }
+                    { label: 'Engagement Guide by Kajal', url: 'https://drive.google.com/file/d/1mrrNxIUOXRKXPVYZsDYvf64fp-8gbOS2/view?usp=sharing' }
                 ]
             },
             {
                 code: 'M3-03',
                 title: 'Case Studies',
                 content: 'Analyze specific client cases and their health journeys.',
-                links: [
-                    { label: 'Case Studies Folder', url: 'https://drive.google.com/drive/folders/10SFZyik_Y4Mw8RkD8x-jz-RxiYIN7Dv6?usp=sharing' }
-                ],
-                caseStudyLinks: [
-                    "https://docs.google.com/presentation/d/1evTjDAlsTwek7th4ROos1rHo5CpEwczE/edit?usp=drive_link",
-                    "https://docs.google.com/presentation/d/1zZ1HWrhFWFxtgAzBAlIVmCiFJzp7ozoi/edit?usp=drive_link",
-                    "https://docs.google.com/presentation/d/1vWqg29CmqDKvsf4iMUr3JSWWD8tiZ0QK/edit?usp=drive_link",
-                    "https://docs.google.com/presentation/d/1x7CEHyQ_QpG0t_vIE3bMVdQ-tLvFV-BT/edit?usp=drive_link",
-                    "https://docs.google.com/presentation/d/1wkSSD0O-zVh03L78tcPiumgo6_aOCEh_/",
-                    "https://docs.google.com/presentation/d/1z7EE9GLwCYa-IPTXooEmM1I2nmWN8jaC/",
-                    "https://docs.google.com/presentation/d/1H2jTl6f6HWZwg0EjCQemXBvDBy3a6571/",
-                    "https://docs.google.com/presentation/d/1bYOuG1eAK4gI3i04HNQ_v8wVBSkMpLw-/",
-                    "https://docs.google.com/presentation/d/12lQ7zOojOnjrIQvWoGV3deg5uEXD-R73/",
-                    "https://docs.google.com/presentation/d/1yk643b3nqYTHWRyaqy9aE7gUkompH0c9/",
-                    "https://docs.google.com/presentation/d/1LIe39pHyV0jrJqD6stVnJAkldQSfhF2V/",
-                    "https://docs.google.com/presentation/d/1bTsF-dbhUi6w7AHP9zQuFrL-AIfQU1jx/",
-                    "https://docs.google.com/presentation/d/1oOmD5NVRtYcfGRBdPVr6_ll2sMNxIIpD/",
-                    "https://docs.google.com/presentation/d/1e8RI6bUG3lUmkHHhIj4wP-0FT6KJDcay/",
+                caseStudies: [
+                    { label: "Case Study 1", url: "https://docs.google.com/presentation/d/1evTjDAlsTwek7th4ROos1rHo5CpEwczE/edit?usp=drive_link" },
+                    { label: "Case Study 2", url: "https://docs.google.com/presentation/d/1zZ1HWrhFWFxtgAzBAlIVmCiFJzp7ozoi/edit?usp=drive_link" },
+                    { label: "Case Study 3", url: "https://docs.google.com/presentation/d/1vWqg29CmqDKvsf4iMUr3JSWWD8tiZ0QK/edit?usp=drive_link" },
+                    { label: "Case Study 4", url: "https://docs.google.com/presentation/d/1x7CEHyQ_QpG0t_vIE3bMVdQ-tLvFV-BT/edit?usp=drive_link" },
+                    { label: "Case Study 5", url: "https://docs.google.com/presentation/d/1wkSSD0O-zVh03L78tcPiumgo6_aOCEh_/" },
+                    { label: "Case Study 6", url: "https://docs.google.com/presentation/d/1z7EE9GLwCYa-IPTXooEmM1I2nmWN8jaC/" },
+                    { label: "Case Study 7", url: "https://docs.google.com/presentation/d/1H2jTl6f6HWZwg0EjCQemXBvDBy3a6571/" },
+                    { label: "Case Study 8", url: "https://docs.google.com/presentation/d/1bYOuG1eAK4gI3i04HNQ_v8wVBSkMpLw-/" },
+                    { label: "Case Study 9", url: "https://docs.google.com/presentation/d/12lQ7zOojOnjrIQvWoGV3deg5uEXD-R73/" },
+                    { label: "Case Study 10", url: "https://docs.google.com/presentation/d/1yk643b3nqYTHWRyaqy9aE7gUkompH0c9/" },
+                    { label: "Case Study 11", url: "https://docs.google.com/presentation/d/1LIe39pHyV0jrJqD6stVnJAkldQSfhF2V/" },
+                    { label: "Case Study 12", url: "https://docs.google.com/presentation/d/1bTsF-dbhUi6w7AHP9zQuFrL-AIfQU1jx/" },
+                    { label: "Case Study 13", url: "https://docs.google.com/presentation/d/1oOmD5NVRtYcfGRBdPVr6_ll2sMNxIIpD/" },
+                    { label: "Case Study 14", url: "https://docs.google.com/presentation/d/1e8RI6bUG3lUmkHHhIj4wP-0FT6KJDcay/" }
                 ]
             },
             {
                 code: 'M3-04',
                 title: 'Inbody BCA training video',
-                content: 'Go through Inbody BCA training video',
+                content: 'Study the Inbody analysis protocols for accurate body composition assessment.',
+                layout: 'grid',
                 links: [
-                    { label: 'Inbody BCA training video part 1', url: 'https://balancenutrition.in/media/bca/BCA1.mp4' },
-                    { label: 'Inbody BCA training video part 2', url: 'https://balancenutrition.in/media/bca/BCA.mp4' }
+                    { label: 'BCA Training: Part 1', url: 'https://balancenutrition.in/media/bca/BCA1.mp4', subtitle: 'Understanding the basic parameters and Inbody setup.' },
+                    { label: 'BCA Training: Part 2', url: 'https://balancenutrition.in/media/bca/BCA.mp4', subtitle: 'Advanced interpretation of visceral fat and muscle-fat analysis.' },
+                    { label: 'BN Smart Scale', url: 'https://drive.google.com/file/d/1e71iJ_c7Af_3kyIxVj2JC9rV_ttPoxLp/view?usp=drive_link', subtitle: 'Step-by-step demonstration of the Balance Nutrition Smart Scale integration and body composition analysis.' }
                 ]
             },
-
             {
                 code: 'M3-05',
                 title: 'Schedule Your Mock Call',
                 content: 'Book a 1-on-1 mock consultation call with your training lead to verify your training progress.',
                 isBooking: true
-            },
+            }
         ]
     },
 
-    // ===== MODULE 5: Dashboard Training (Shifted from M4) =====
+    // ===== MODULE 4: Dashboard Training =====
     {
         id: 'module-4',
         title: 'Module 4: Dashboard Training',
@@ -286,19 +326,28 @@ export const syllabusData: Module[] = [
         topics: [
             {
                 code: 'M4-01',
-                title: 'Dashboard Ecosystem Overview',
+                title: 'Dashboard Operating System',
                 content: 'Experience the primary dashboard interface. Learn to navigate between active clients, pending assessments, and lead queues.',
-
                 links: [
                     { label: 'New Dashboard Training', url: 'https://drive.google.com/file/d/15uCOJerhQPSOm0-mT7v69nwwYI--hvFP/view?usp=sharing' },
                     { label: 'Dashboard Zoom Training', url: 'https://us06web.zoom.us/rec/play/YuxuYhPOyeSZVV6EAPk29-02-hpnKoxAeUhs-MSemS2gVkC1W7aHM5eyBtEk2DT0d6uQ0YJcosy5uI2N.cA7ZDPQ25UO-MvaE?eagerLoadZvaPages=&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2FYYZegf70CLl_i0uZkDsged9FbRJqU78GOB4iGNCfTjXgQwNuU5e9UTaov6w1BwSt.hjQaGMo8uoG722M5' },
                     { label: 'Explore Dashboard', url: 'https://counsellor.balancenutrition.in/' }
                 ]
             },
-
+            {
+                code: 'M4-02',
+                title: 'Business Proficiency Viva',
+                content: 'Simulate a live client consultation. The AI client will ask about Balance Nutrition programs (U-Smart, Smart+, etc.). Practice explaining our USPs and pricing.',
+                hasLive: true,
+                persona: {
+                    story: "I am a 32-year-old marketing manager with PCOS and weight gain. I've tried many diets but always fail.",
+                    goal: "Ask the mentor about the difference between Weight Loss Pro and Beat PCOS programs. Focus on pricing and long-term support."
+                }
+            }
         ]
     },
-    // ===== MODULE 3: Sales skill training (Repositioned from M5) =====
+
+    // ===== MODULE 5: Sales skill training =====
     {
         id: 'module-5',
         title: 'Module 5: Sales skill training',
@@ -315,17 +364,15 @@ export const syllabusData: Module[] = [
                 title: 'Training Resource',
                 content: 'Final management training summaries and wrap-up sessions.',
                 links: [
-                    { label: 'CIS live presntation and follow ups', url: 'https://docs.google.com/document/d/1OgHV7RzQNBrTXFWiIWhPyMKAQLSAIOy6/edit' },
+                    { label: 'CIS live presentation and follow ups', url: 'https://docs.google.com/document/d/1OgHV7RzQNBrTXFWiIWhPyMKAQLSAIOy6/edit' },
                     { label: 'CIS Intro overview to sales2', url: 'https://docs.google.com/document/d/1rbAm8SwXj4SJ_0urlSmBQ4ss4md00SN3/edit' },
                     { label: 'CIS Goal setting', url: 'https://docs.google.com/document/d/1lo_Hx07qjO1YBxfYJCVhzLad8J4jqHgK/edit' },
                     { label: 'Engagement Manual', url: 'https://docs.google.com/document/d/1BGs732y6H04XHySp7r3ivu8n4fkF-MjMHJv_wYvbhA8/edit?tab=t.0#heading=h.lhggr0z4ly8' },
                     { label: 'Wallet Money Doc', url: 'https://docs.google.com/spreadsheets/d/1X9T8TJw9UX7AtdNiZrRUA_pvQYRM8AMd5Fu1kuozISo/edit?gid=0#gid=0' },
                     { label: 'WhatsApp Dos and Donts', url: 'https://drive.google.com/file/d/1fFUtJPGTBb_cLVGizvC4EwtKNOh23vDG/view' },
                     { label: 'Lead Conversion (Consultation) Training by Krishna', url: 'https://us06web.zoom.us/rec/play/tH49jQn_4nKfmAaHkjtYZD1BbE7XhVjxiMBK4qsp3PG_HHiPT24Q6Gbkmv9l1duLFczNqgJHrST8I0t-.hFkYNmkz4w3CAw5V?eagerLoadZvaPages=sidemenu.billing.plan_management&accessLevel=meeting&canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fus06web.zoom.us%2Frec%2Fshare%2FFGUqZ4uRA8jnB-HXnKYReWXxUrCrpYB64UlBhHzjjVOfCpYilXKpJnSFoL8Q2yh1.rn_6BNdfPwOc10XD' }
-
                 ]
             },
-
             {
                 code: 'M5-02',
                 title: 'Founders Sales Mastery Phase 2',
@@ -354,8 +401,7 @@ export const syllabusData: Module[] = [
                     { label: 'Sales Training Part 7', url: 'https://youtu.be/e_WOl6UuWMg' },
                     { label: 'Sales Training Part 8', url: 'https://www.youtube.com/watch?v=g6OzGs9McRA' }
                 ]
-            },
-
+            }
         ]
     },
 
@@ -380,7 +426,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'VB-02',
                 title: 'Sales Training: Day 1 (Part 2)',
-                content: '4.10 to 11.35: Detailed consultation structure walkthrough.',
+                content: 'Detailed consultation structure walkthrough.',
                 links: [{ label: 'Watch Video', url: 'https://youtu.be/gYvr-Fdb9z4' }]
             },
             {
@@ -422,7 +468,7 @@ export const syllabusData: Module[] = [
             {
                 code: 'VB-09',
                 title: 'Sales Training: Day 5 (Part 1)',
-                content: '16.08 to 26: Mock consultation session by the Founder.',
+                content: 'Mock consultation session by the Founder.',
                 links: [{ label: 'Watch Video', url: 'https://youtu.be/g6OzGs9McRA' }]
             },
             {
@@ -443,25 +489,6 @@ export const syllabusData: Module[] = [
                 content: 'Final management team training summary and wrap-up.',
                 links: [{ label: 'Watch Video', url: 'https://youtu.be/hM9O_PvTnf4' }]
             },
-            {
-                code: 'RB-01',
-                title: "Khyati Ma'am's Video",
-                content: 'Core training philosophy and founder vision address.',
-                links: [{ label: 'Watch Video', url: '#' }]
-            },
-            {
-                code: 'RB-02',
-                title: '3T Manual',
-                content: 'The Comprehensive Technical Trainer Manual (3T Protocol).',
-                links: [{ label: 'Open Manual', url: '#' }]
-            },
-            {
-                code: 'RB-03',
-                title: 'Facebook Content Library',
-                content: 'Full repository of marketing and engagement assets.',
-                links: [{ label: 'Access Library', url: '#' }]
-            },
-            // Phase 1 Program Videos
             {
                 code: 'PV-P1-01',
                 title: 'Weight Loss Pro Program',
@@ -486,7 +513,6 @@ export const syllabusData: Module[] = [
                 content: 'Phase 1: 30-day intensive weight loss walkthrough.',
                 links: [{ label: 'Watch Training', url: 'https://youtu.be/4U56FpjvteM' }]
             },
-            // Phase 2 Program Videos
             {
                 code: 'PV-P2-01',
                 title: 'Renue Program',

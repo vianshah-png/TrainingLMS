@@ -31,7 +31,15 @@ import {
     HeartPulse,
     Calendar,
     Mail,
-    MessageCircle
+    MessageCircle,
+    ChevronDown,
+    ChevronUp,
+    LayoutDashboard,
+    Headphones,
+    Mic,
+    Layers,
+    Copy,
+    Instagram
 } from "lucide-react";
 import YouTubePlayer from "./YouTubePlayer";
 import AcademySimulator from "./AcademySimulator";
@@ -63,8 +71,11 @@ function getEmbedUrl(url: string | undefined): string | null {
         return `https://www.youtube.com/embed/${ytMatch[2]}`;
     }
 
-    // Google Drive - Disable embedding as it often violates CSP
+    // Google Drive - Enable embedding for files, but skip folders (folders cause 403 in iframes)
     if (url.includes('drive.google.com')) {
+        if (url.includes('/file/d/')) {
+            return url.replace(/\/(view|edit|present|preview).*$/, '/preview');
+        }
         return null;
     }
 
@@ -74,6 +85,20 @@ function getEmbedUrl(url: string | undefined): string | null {
     }
 
     return null;
+}
+
+function getSlideThumbnail(url: string | null): string | null {
+    if (!url || !url.includes('docs.google.com/presentation')) return null;
+    const idMatch = url.match(/\/d\/([^\/]+)/);
+    if (!idMatch) return null;
+    return `https://docs.google.com/presentation/d/${idMatch[1]}/export/png`;
+}
+
+function getYouTubeVideoId(url: string | undefined): string | null {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
 }
 
 function getDocEmbedUrl(url: string | null): string {
@@ -86,6 +111,13 @@ function getDocEmbedUrl(url: string | null): string {
         return url.replace(/\/(edit|preview|present).*$/, '/embed');
     }
     if (url.includes('docs.google.com') || url.includes('drive.google.com')) {
+        // Handle Folders specifically
+        if (url.includes('/drive/folders/') || url.includes('/drive/u/0/folders/')) {
+            const folderIdMatch = url.match(/\/folders\/([^\/?#]+)/);
+            if (folderIdMatch) {
+                return `https://drive.google.com/embeddedfolderview?id=${folderIdMatch[1]}#grid`;
+            }
+        }
         return url.replace(/\/(edit|view|present|view\?usp=sharing).*$/, '/preview');
     }
     return url;
@@ -99,8 +131,18 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
     const [assignmentCompleted, setAssignmentCompleted] = useState(false);
     const [showHealthPopup, setShowHealthPopup] = useState(false);
     const [selectedCaseStudy, setSelectedCaseStudy] = useState<string | null>(null);
+    const [showSimulation, setShowSimulation] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState<{ url: string, label: string } | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [emailStatus, setEmailStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+    const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+    const [selectedAccordionLink, setSelectedAccordionLink] = useState<any>(null);
+    const [activeSubResource, setActiveSubResource] = useState<any>(null);
+    const [showAllCaseStudies, setShowAllCaseStudies] = useState(false);
+    const [activeGridVideo, setActiveGridVideo] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [healthTab, setHealthTab] = useState<'doctors' | 'pharma'>('doctors');
+
 
     const sendMockCallEmail = async (mentorName: string, mentorEmail: string) => {
         const key = mentorEmail;
@@ -135,9 +177,9 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
     const embedUrl = getEmbedUrl(mediaLink?.url);
 
     // Links to display in the UI (hides the media link if it's playing as a video, unless in edit mode)
-    const displayLinks = isEditMode
+    const displayLinks = (isEditMode
         ? topic.links
-        : topic.links?.filter(link => !(embedUrl && link === mediaLink));
+        : topic.links?.filter(link => !(topic.layout !== 'grid' && embedUrl && link === mediaLink))) || [];
 
     // Persist progress to local storage
     useEffect(() => {
@@ -217,7 +259,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
-                            className="w-full max-w-2xl bg-white rounded-[3rem] p-12 shadow-2xl relative overflow-hidden"
+                            className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden"
                         >
                             <button
                                 onClick={() => setShowHealthPopup(false)}
@@ -226,49 +268,188 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 <X size={24} />
                             </button>
 
-                            <div className="mb-10 text-left">
+                            <div className="mb-8 text-left">
                                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FF5733]/10 text-[#FF5733] rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
                                     <Activity size={12} />
                                     BN Health Ecosystem
                                 </div>
-                                <h2 className="text-4xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
-                                <p className="text-gray-500 font-medium italic">"Integrated support for optimized client results."</p>
+                                <h2 className="text-3xl font-serif text-[#0E5858] mb-2">Health & Diagnostics</h2>
+                                <p className="text-gray-500 font-medium italic text-sm">"Integrated support for optimized client results."</p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <a
-                                    href="https://drive.google.com/file/d/1smbdyHpELk0-07mpUxvkTIiXG3gV5Ftp/view?usp=drive_link"
-                                    target="_blank"
-                                    className="p-8 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-4 text-center items-center transition-all shadow-sm hover:shadow-xl"
+                            {/* Tab Selector */}
+                            <div className="flex gap-2 mb-8 bg-[#FAFCEE] rounded-2xl p-1.5">
+                                <button
+                                    onClick={() => setHealthTab('doctors')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${healthTab === 'doctors' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/60 hover:text-[#0E5858]'}`}
                                 >
-                                    <div className="w-16 h-16 rounded-2xl bg-[#00B6C1]/10 text-[#00B6C1] flex items-center justify-center group-hover:bg-[#00B6C1] group-hover:text-white transition-all">
-                                        <FlaskConical size={28} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-serif text-[#0E5858] mb-1">BN Diagnostics</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Lab Integration & Reports</p>
-                                    </div>
-                                    <ArrowUpRight size={18} className="text-[#00B6C1] mt-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                </a>
-
-                                <a
-                                    href="https://drive.google.com/drive/folders/1GN7nDd6QmuiO2rmMB1uiQUvYeqIZPuGK?usp=sharing"
-                                    target="_blank"
-                                    className="p-8 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-4 text-center items-center transition-all shadow-sm hover:shadow-xl"
+                                    <Stethoscope size={16} />
+                                    Doctors
+                                </button>
+                                <button
+                                    onClick={() => setHealthTab('pharma')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${healthTab === 'pharma' ? 'bg-[#0E5858] text-white shadow-lg' : 'text-[#0E5858]/60 hover:text-[#0E5858]'}`}
                                 >
-                                    <div className="w-16 h-16 rounded-2xl bg-[#FFCC00]/10 text-[#FFCC00] flex items-center justify-center group-hover:bg-[#FFCC00] group-hover:text-[#0E5858] transition-all">
-                                        <Stethoscope size={28} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xl font-serif text-[#0E5858] mb-1">BN Doctors</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Specialist Network</p>
-                                    </div>
-                                    <ArrowUpRight size={18} className="text-[#00B6C1] mt-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                </a>
+                                    <FlaskConical size={16} />
+                                    Pharma Partnerships
+                                </button>
                             </div>
 
-                            <p className="mt-10 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Click a service to view specialized protocols</p>
+                                        {healthTab === 'doctors' ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/Doctor_X_BN_Life.pdf', label: 'Nutrinoal Inegration' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-[#00B6C1]/10 text-[#00B6C1] flex items-center justify-center group-hover:bg-[#00B6C1] group-hover:text-white transition-all">
+                                                        <Stethoscope size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Nutrinoal Inegration</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Doctor Referral Protocol</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/BN_Smart_Clinic_Pitch.pdf', label: 'BN Smart Clinic' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-[#FFCC00]/10 text-[#FFCC00] flex items-center justify-center group-hover:bg-[#FFCC00] group-hover:text-[#0E5858] transition-all">
+                                                        <FlaskConical size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Smart Clinic</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Diagnostics & Smart Tools</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/Pharma_Pitch_Deck.pdf', label: 'Pharma Partnerships' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                                                        <FlaskConical size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Pharma Partnerships</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Pharmaceutical Alliances</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setShowHealthPopup(false);
+                                                        setSelectedDocument({ url: '/BN_Chemist_Deck.pdf', label: 'Chemist Partnerships' });
+                                                    }}
+                                                    className="p-7 group bg-[#FAFCEE] rounded-3xl border-2 border-transparent hover:border-[#00B6C1]/20 flex flex-col gap-3 text-center items-center transition-all shadow-sm hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-all">
+                                                        <ShoppingBag size={26} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-lg font-serif text-[#0E5858] mb-1">Chemist Partnerships</h4>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Retail Pharmacy Network</p>
+                                                    </div>
+                                                    <ArrowUpRight size={16} className="text-[#00B6C1] mt-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                            <p className="mt-8 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Select a document to view protocols</p>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Standard Document Overlay */}
+            <AnimatePresence>
+                {selectedDocument && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className={`fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-12 transition-all duration-500 ${(selectedDocument.label.toLowerCase().includes('clip') || selectedDocument.label.toLowerCase().includes('call'))
+                                ? 'bg-black/40 backdrop-blur-sm'
+                                : 'bg-[#0E5858]/95 backdrop-blur-xl'
+                            }`}
+                    >
+                        <div className={`w-full transition-all duration-500 ${(selectedDocument.label.toLowerCase().includes('clip') || selectedDocument.label.toLowerCase().includes('call'))
+                                ? 'max-w-xl bg-[#0E5858] p-8 rounded-[2.5rem] shadow-2xl border border-white/10'
+                                : 'max-w-5xl'
+                            }`}>
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h3 className="text-3xl font-serif text-white mb-1">{selectedDocument.label}</h3>
+                                    <p className="text-[#00B6C1] text-xs font-bold uppercase tracking-widest">
+                                        {selectedDocument.label.toLowerCase().includes('clip') || selectedDocument.label.toLowerCase().includes('call') ? 'Audio Player' : 'Document Viewer'}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedDocument(null)}
+                                    className="w-14 h-14 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all border border-white/10"
+                                >
+                                    <X size={28} />
+                                </button>
+                            </div>
+
+                            {/* Adaptive Player Container */}
+                            {(() => {
+                                const isEmbeddable = selectedDocument.url.includes('docs.google.com') ||
+                                    selectedDocument.url.includes('drive.google.com') ||
+                                    selectedDocument.url.includes('zoom.us') ||
+                                    selectedDocument.url.toLowerCase().endsWith('.mp4') ||
+                                    selectedDocument.url.toLowerCase().endsWith('.pdf');
+                                const isAudio = selectedDocument.label.toLowerCase().includes('clip') || selectedDocument.label.toLowerCase().includes('call');
+
+                                if (!isEmbeddable && !isAudio) {
+                                    // Non-embeddable URL — show a clean open-in-browser card
+                                    return (
+                                        <div className="w-full h-[300px] rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center gap-6">
+                                            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-white">
+                                                <ExternalLink size={36} />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-white/70 text-sm font-medium mb-1">This resource opens in a new browser tab</p>
+                                                <p className="text-white/30 text-[10px] uppercase tracking-widest font-bold">External website</p>
+                                            </div>
+                                            <a
+                                                href={selectedDocument.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={() => setSelectedDocument(null)}
+                                                className="px-10 py-4 bg-[#00B6C1] hover:bg-white text-white hover:text-[#0E5858] rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl"
+                                            >
+                                                Open Resource →
+                                            </a>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className={`w-full rounded-2xl overflow-hidden shadow-2xl border border-white/5 bg-black ${isAudio ? 'h-[100px]' : 'h-[75vh]'}`}>
+                                        <iframe
+                                            src={getDocEmbedUrl(selectedDocument.url)}
+                                            className="w-full h-full"
+                                            allow="autoplay"
+                                        />
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -314,7 +495,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 />
                             ) : (
                                 <div
-                                    className="text-gray-500 leading-relaxed text-base font-medium"
+                                    className="text-gray-600 leading-relaxed text-[15px] font-medium"
                                     dangerouslySetInnerHTML={{ __html: topic.content }}
                                 />
                             )}
@@ -363,7 +544,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                 </div>
                             )}
 
-                            {displayLinks && displayLinks.length > 0 && !topic.caseStudyLinks && (
+                            {((displayLinks && displayLinks.length > 0) || topic.isAccordion) && !topic.caseStudyLinks && (
                                 <div className="space-y-6 flex-1 min-w-[300px]">
                                     <div className="flex items-center justify-between mb-4 px-1">
                                         <div className="flex items-center gap-4">
@@ -438,68 +619,366 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             </button>
                                         </div>
                                     ) : topic.layout === 'grid' ? (
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                            {displayLinks.map(link => (
-                                                <motion.a
-                                                    key={link.label}
-                                                    href={link.url}
-                                                    target={link.isPopup ? undefined : "_blank"}
-                                                    rel="noopener noreferrer"
-                                                    whileHover={{ y: -8, scale: 1.02 }}
-                                                    onClick={(e) => {
-                                                        if (link.isPopup) {
-                                                            e.preventDefault();
-                                                            setShowHealthPopup(true);
-                                                        }
-                                                        logActivity('click_link', { topicCode: topic.code, contentTitle: link.label });
-                                                    }}
-                                                    className="group/grid-card flex flex-col items-center text-center p-6 bg-white rounded-[2rem] shadow-sm hover:shadow-2xl transition-all border border-[#0E5858]/5 hover:border-[#00B6C1]/20 relative overflow-hidden aspect-[4/5] justify-center"
-                                                >
-                                                    <div className="absolute inset-0 bg-gradient-to-b from-[#FAFCEE]/30 to-transparent opacity-0 group-hover/grid-card:opacity-100 transition-opacity"></div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                            {displayLinks.map((link) => {
+                                                const isVideo = link.url.toLowerCase().endsWith('.mp4') || link.url.toLowerCase().endsWith('.mov') || link.url.includes('drive.google.com/file/d/');
+                                                const isDocs = !isVideo && (link.isPopup || link.url.includes('drive.google.com') || link.url.includes('docs.google.com') || link.url.toLowerCase().includes('.pdf') || link.label.toLowerCase().includes('catalogue') || link.label.toLowerCase().includes('catelogue'));
 
-                                                    <div className="w-16 h-16 rounded-full bg-[#FAFCEE] flex items-center justify-center text-[#00B6C1] mb-6 group-hover/grid-card:bg-[#00B6C1] group-hover/grid-card:text-white transition-all shadow-inner">
-                                                        {link.icon === 'shop' && <ShoppingBag size={28} />}
-                                                        {link.icon === 'target' && <Target size={28} />}
-                                                        {link.icon === 'globe' && <Globe size={28} />}
-                                                        {link.icon === 'activity' && <Activity size={28} />}
-                                                        {link.icon === 'building' && <Building2 size={28} />}
-                                                        {link.icon === 'dumbbell' && <Dumbbell size={28} />}
-                                                        {link.icon === 'medical' && <Stethoscope size={28} />}
-                                                        {link.icon === 'flask' && <FlaskConical size={28} />}
-                                                        {link.icon === 'school' && <School size={28} />}
-                                                        {!link.icon && <FileText size={28} />}
+                                                return (
+                                                    <motion.div
+                                                        key={link.label}
+                                                        layout
+                                                        whileHover={activeGridVideo === link.url ? {} : { y: -8, scale: 1.01 }}
+                                                        onClick={() => {
+                                                            if (activeGridVideo === link.url) return;
+                                                            if (link.isCopyOnly) {
+                                                                navigator.clipboard.writeText(link.url);
+                                                                setCopiedId(link.url);
+                                                                setTimeout(() => setCopiedId(null), 2000);
+                                                                return;
+                                                            }
+                                                            if (link.isPopup) {
+                                                                setShowHealthPopup(true);
+                                                            } else if (isDocs) {
+                                                                setSelectedDocument({ url: link.url, label: link.label });
+                                                            } else if (isVideo) {
+                                                                setActiveGridVideo(link.url);
+                                                            } else {
+                                                                setSelectedDocument({ url: link.url, label: link.label });
+                                                            }
+                                                            logActivity('click_link', { topicCode: topic.code, contentTitle: link.label });
+                                                        }}
+                                                        className={`group/grid-card cursor-pointer flex flex-col bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl transition-all duration-500 border border-[#0E5858]/10 hover:border-[#00B6C1]/20 relative overflow-hidden h-[300px] ${activeGridVideo === link.url ? 'ring-4 ring-[#00B6C1] z-50' : ''}`}
+                                                    >
+                                                        {activeGridVideo === link.url ? (
+                                                            <div className="absolute inset-0 bg-black animate-in fade-in duration-500">
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setActiveGridVideo(null);
+                                                                    }}
+                                                                    className="absolute top-4 right-4 z-[60] w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all border border-white/20 shadow-xl"
+                                                                >
+                                                                    <X size={20} />
+                                                                </button>
+                                                                <iframe 
+                                                                    src={getEmbedUrl(link.url) || link.url} 
+                                                                    className="w-full h-full border-0" 
+                                                                    allow="autoplay; fullscreen"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className={`aspect-video w-full relative overflow-hidden flex items-center justify-center ${isVideo ? 'bg-black' : link.isCopyOnly ? 'bg-gradient-to-br from-[#E1306C]/10 via-[#C13584]/10 to-[#833AB4]/10' : 'bg-[#FAFCEE]'}`}>
+                                                                    {isVideo ? (
+                                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                                            <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center group-hover/grid-card:scale-110 transition-transform z-20">
+                                                                                <Play size={32} className="text-white fill-current translate-x-1" />
+                                                                            </div>
+                                                                            <img 
+                                                                                src={`https://images.unsplash.com/photo-1576091160550-217359f4bd01?w=800&q=80&auto=format&fit=crop`} 
+                                                                                className="w-full h-full object-cover opacity-60 grayscale group-hover/grid-card:grayscale-0 transition-all duration-700" 
+                                                                                alt="Video Preview"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl group-hover/grid-card:scale-110 transition-transform ${link.isCopyOnly ? 'bg-gradient-to-br from-[#E1306C] to-[#833AB4] text-white' : 'bg-white text-[#00B6C1]'}`}>
+                                                                            {link.icon === 'shop' && <ShoppingBag size={28} />}
+                                                                            {link.icon === 'target' && <Target size={28} />}
+                                                                            {link.icon === 'globe' && <Globe size={28} />}
+                                                                            {link.icon === 'activity' && <Activity size={28} />}
+                                                                            {link.icon === 'building' && <Building2 size={28} />}
+                                                                            {link.icon === 'dumbbell' && <Dumbbell size={28} />}
+                                                                            {link.icon === 'medical' && <Stethoscope size={28} />}
+                                                                            {link.icon === 'flask' && <FlaskConical size={28} />}
+                                                                            {link.icon === 'school' && <School size={28} />}
+                                                                            {link.icon === 'instagram' && <Instagram size={28} />}
+                                                                            {!link.icon && <FileText size={28} />}
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Copied Toast */}
+                                                                    {link.isCopyOnly && copiedId === link.url && (
+                                                                        <div className="absolute inset-0 bg-gradient-to-br from-[#E1306C] to-[#833AB4] flex items-center justify-center z-30 animate-in fade-in duration-300">
+                                                                            <div className="flex flex-col items-center gap-2 text-white">
+                                                                                <CheckCircle size={32} />
+                                                                                <span className="text-xs font-bold uppercase tracking-widest">Copied!</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="p-5 flex flex-col flex-1">
+                                                                    <div className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1.5 ${isVideo ? 'text-[#00B6C1]' : link.isCopyOnly ? 'text-[#E1306C]' : 'text-gray-400'}`}>
+                                                                        {isVideo ? 'Training Video' : link.isCopyOnly ? 'Tap to Copy · Instagram' : 'Reference Material'}
+                                                                    </div>
+                                                                    <h5 className="text-base font-serif text-[#0E5858] mb-2 group-hover/grid-card:text-[#00B6C1] transition-colors">{link.label}</h5>
+                                                                    <p className="text-[12px] font-medium leading-relaxed text-gray-500 mb-4 line-clamp-2">{link.subtitle || (link.isCopyOnly ? 'Tap to copy this ID, then paste in Instagram search on your phone.' : 'Review this resource to strengthen your understanding.')}</p>
+                                                                    
+                                                                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-50">
+                                                                        <span className="text-[9px] font-bold text-[#0E5858]/60 uppercase tracking-widest">
+                                                                            {isVideo ? 'Play on Dashboard' : link.isCopyOnly ? (copiedId === link.url ? '✓ Copied to Clipboard' : 'Click to Copy ID') : 'View in Dashboard'}
+                                                                        </span>
+                                                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${link.isCopyOnly ? 'bg-[#E1306C]/10 group-hover/grid-card:bg-[#E1306C]' : 'bg-[#FAFCEE] group-hover/grid-card:bg-[#0E5858]'}`}>
+                                                                            {isVideo ? <Play size={12} className="group-hover/grid-card:text-white" /> : link.isCopyOnly ? <Copy size={12} className="group-hover/grid-card:text-white" /> : <ArrowRight size={12} className="group-hover/grid-card:text-white" />}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </motion.div>
+                                                )
+                                            })}
+                                        </div>
+
+                                    ) : topic.isAccordion ? (
+                                        <div className="space-y-6 w-full max-w-4xl">
+                                            {/* Specialized Dropdown for Program Training (M2-03) */}
+                                            {topic.code === 'M2-03' ? (
+                                                <div className="w-full">
+                                                    <div className="relative group/dropdown">
+                                                        <div className="absolute -inset-1 bg-gradient-to-r from-[#00B6C1] to-[#0E5858] rounded-[2rem] blur opacity-20 group-hover/dropdown:opacity-40 transition-opacity"></div>
+                                                        <div className="relative bg-white border border-[#0E5858]/10 rounded-[1.8rem] p-2 flex flex-col md:flex-row items-center gap-4 shadow-xl">
+                                                            <div className="w-full md:w-auto px-6 py-3 bg-[#FAFCEE] rounded-2xl flex items-center gap-3">
+                                                                <Layers size={18} className="text-[#0E5858]" />
+                                                                <span className="text-[10px] font-black text-[#0E5858] uppercase tracking-widest whitespace-nowrap">Select Program</span>
+                                                            </div>
+                                                            <select
+                                                                value={activeSubResource?.url || ""}
+                                                                onChange={(e) => {
+                                                                    const selected = topic.links?.[0]?.subLinks?.find(sl => sl.url === e.target.value);
+                                                                    if (selected) {
+                                                                        setActiveSubResource(selected);
+                                                                        logActivity('select_program_dropdown', { topicCode: topic.code, program: selected.label });
+                                                                    }
+                                                                }}
+                                                                className="flex-1 bg-transparent border-none focus:ring-0 text-[#0E5858] font-serif text-lg py-2 px-4 cursor-pointer appearance-none"
+                                                            >
+                                                                <option value="" disabled>— Choose a program to start training —</option>
+                                                                {topic.links?.[0]?.subLinks?.map((subLink, i) => (
+                                                                    <option key={i} value={subLink.url}>{subLink.label}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="absolute right-6 pointer-events-none text-[#00B6C1]">
+                                                                <ChevronDown size={20} />
+                                                            </div>
+                                                        </div>
                                                     </div>
 
-                                                    <h5 className="text-sm font-serif text-[#0E5858] mb-1 group-hover/grid-card:text-[#00B6C1] transition-colors">{link.label}</h5>
-                                                    <p className="text-[9px] font-medium text-gray-400 mb-4">{link.subtitle || 'Direct Resource Link'}</p>
-
-                                                    <div className="mt-auto px-4 py-1.5 bg-[#FAFCEE] rounded-full flex items-center gap-1.5 group-hover/grid-card:bg-[#0E5858] transition-colors">
-                                                        <FileText size={10} className="text-[#00B6C1] group-hover/grid-card:text-white" />
-                                                        <span className="text-[8px] font-black text-[#00B6C1] group-hover/grid-card:text-white uppercase tracking-widest">Brochure</span>
+                                                    {/* Integrated Video Player for M2-03 */}
+                                                    {activeSubResource && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            className="mt-8 relative"
+                                                        >
+                                                            <div className="absolute -inset-4 bg-white/50 blur-3xl -z-10"></div>
+                                                            <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(14,88,88,0.2)] border-4 border-white bg-black group/player relative">
+                                                                <YouTubePlayer 
+                                                                    videoId={getYouTubeVideoId(activeSubResource.url) || ""} 
+                                                                    onComplete={() => setVideoCompleted(true)}
+                                                                />
+                                                                <div className="absolute top-6 left-6 z-10">
+                                                                    <div className="px-4 py-2 bg-black/60 backdrop-blur-md rounded-xl text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 border border-white/10">
+                                                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                                                        Training in progress
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-6 flex items-center justify-between px-4">
+                                                                <div>
+                                                                    <h4 className="text-xl font-serif text-[#0E5858]">{activeSubResource.label}</h4>
+                                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Foundational Program Training • v3.1</p>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => window.open(activeSubResource.url, '_blank')}
+                                                                    className="flex items-center gap-2 px-4 py-2 bg-[#FAFCEE] text-[#0E5858] rounded-xl text-[10px] font-black uppercase tracking-widest border border-[#0E5858]/10 hover:bg-[#0E5858] hover:text-white transition-all shadow-sm"
+                                                                >
+                                                                    <ExternalLink size={14} /> View on YouTube
+                                                                </button>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* Category Tabs - Stacked Vertically */}
+                                                    <div className="flex flex-col gap-3 w-full">
+                                                        {displayLinks.map((link, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    setSelectedAccordionLink(link);
+                                                                    setActiveSubResource(null);
+                                                                    logActivity('select_category', { topicCode: topic.code, category: link.label });
+                                                                }}
+                                                                className={`flex items-center gap-4 p-5 rounded-[1.5rem] border-2 transition-all duration-300 w-full ${selectedAccordionLink?.label === link.label
+                                                                    ? 'bg-[#0E5858] border-[#0E5858] text-white shadow-xl shadow-[#0E5858]/20'
+                                                                    : 'bg-[#FAFCEE] border-[#0E5858]/10 text-[#0E5858] hover:border-[#00B6C1]/40 hover:bg-white shadow-sm'}`}
+                                                            >
+                                                                <div className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center transition-colors ${selectedAccordionLink?.label === link.label ? 'bg-white/10 text-white' : 'bg-white text-[#0E5858] shadow-sm'}`}>
+                                                                    {link.icon === 'audio' ? <Headphones size={24} /> : <LayoutDashboard size={24} />}
+                                                                </div>
+                                                                <div className="text-left min-w-0 flex-1">
+                                                                    <span className="text-sm font-bold block">{link.label}</span>
+                                                                    <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${selectedAccordionLink?.label === link.label ? 'text-white/60' : 'text-gray-400'}`}>
+                                                                        {link.subLinks?.length || 0} Resources
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                </motion.a>
-                                            ))}
+
+                                                    {selectedAccordionLink && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            className="bg-white border border-[#0E5858]/10 rounded-[2rem] p-5 shadow-lg w-full overflow-hidden"
+                                                        >
+                                                            {/* Compact Player Section */}
+                                                            <div className="flex flex-col items-center text-center mb-5">
+                                                                <h5 className="text-lg font-serif text-[#0E5858] mb-0.5">{activeSubResource?.label || selectedAccordionLink.label}</h5>
+                                                                <p className="text-[9px] font-bold text-[#00B6C1] uppercase tracking-[0.2em] mb-3">
+                                                                    {activeSubResource ? 'Currently Playing' : 'Select a recording below'}
+                                                                </p>
+
+                                                                {/* Centered Player - Dynamic Height based on content */}
+                                                                <div className={`w-full max-w-lg ${activeSubResource?.url?.includes('youtube.com') || activeSubResource?.url?.includes('youtu.be') ? 'aspect-video' : 'h-[120px]'} bg-black rounded-2xl overflow-hidden shadow-xl border border-white/10 relative mx-auto transition-all duration-500`}>
+                                                                    {activeSubResource?.url?.includes('youtube.com') || activeSubResource?.url?.includes('youtu.be') ? (
+                                                                        <YouTubePlayer 
+                                                                            videoId={getYouTubeVideoId(activeSubResource.url) || ""} 
+                                                                            onComplete={() => setVideoCompleted(true)}
+                                                                        />
+                                                                    ) : (
+                                                                        <iframe
+                                                                            src={getDocEmbedUrl(activeSubResource?.url || (selectedAccordionLink.subLinks?.[0]?.url) || selectedAccordionLink.url)}
+                                                                            className="w-full h-full"
+                                                                            allow="autoplay"
+                                                                        />
+                                                                    )}
+                                                                    
+                                                                    {!activeSubResource && (
+                                                                        <div className="absolute inset-0 bg-[#0E5858]/80 backdrop-blur-md flex items-center justify-center gap-3 text-white cursor-pointer" onClick={() => setActiveSubResource(selectedAccordionLink.subLinks?.[0])}>
+                                                                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                                                                <Play size={18} fill="white" />
+                                                                            </div>
+                                                                            <p className="text-xs font-bold">Tap to play Master Recording</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Thin separator */}
+                                                            <div className="w-full h-px bg-[#0E5858]/5 mb-4"></div>
+
+                                                            {/* Compact Horizontal Media Strip */}
+                                                            {selectedAccordionLink.subLinks && selectedAccordionLink.subLinks.length > 0 && (
+                                                                <div className="w-full">
+                                                                    <div className="flex items-center gap-2 mb-3">
+                                                                        <div className="w-1 h-4 bg-[#00B6C1] rounded-full"></div>
+                                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Media Repository</p>
+                                                                        <span className="ml-auto text-[8px] text-[#0E5858]/30 font-bold uppercase tracking-widest">Scroll →</span>
+                                                                    </div>
+                                                                    <div className="flex overflow-x-auto pb-3 gap-4 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(14,88,88,0.15) transparent' }}>
+                                                                        {selectedAccordionLink.subLinks.map((subLink: { label: string, url: string }, i: number) => (
+                                                                            <motion.div
+                                                                                key={i}
+                                                                                whileHover={{ y: -5, scale: 1.02 }}
+                                                                                whileTap={{ scale: 0.97 }}
+                                                                                onClick={() => {
+                                                                                    setActiveSubResource(subLink);
+                                                                                    logActivity('select_subresource', { topicCode: topic.code, subLink: subLink.url });
+                                                                                }}
+                                                                                className={`flex-none w-[200px] h-[120px] rounded-2xl p-4 flex flex-col justify-between cursor-pointer group/sub transition-all snap-start shadow-sm hover:shadow-xl border relative ${activeSubResource?.url === subLink.url
+                                                                                        ? 'bg-[#0E5858] border-[#0E5858] text-white ring-2 ring-[#00B6C1]/30'
+                                                                                        : 'bg-[#FAFCEE] border-[#0E5858]/5 text-[#0E5858] hover:bg-white hover:border-[#00B6C1]/30'
+                                                                                    }`}
+                                                                            >
+                                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-colors ${activeSubResource?.url === subLink.url ? 'bg-white/10 text-white' : 'bg-white text-[#00B6C1]'}`}>
+                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
+                                                                                </div>
+                                                                                <p className="text-[11px] font-bold leading-tight line-clamp-2">{subLink.label}</p>
+                                                                            </motion.div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {displayLinks.map(link => (
-                                                <a
-                                                    key={link.label}
-                                                    href={link.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={() => logActivity('click_link', { topicCode: topic.code, contentTitle: link.label })}
-                                                    className="group/link flex items-center justify-between px-4 py-3 bg-white text-[#0E5858] shadow-sm hover:shadow-xl rounded-2xl text-[11px] font-bold border border-[#0E5858]/5 hover:border-[#00B6C1]/20 transition-all"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 bg-[#FAFCEE] rounded-lg text-[#00B6C1] group-hover/link:bg-[#00B6C1] group-hover/link:text-white transition-colors">
-                                                            <Share2 size={12} />
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {displayLinks.map(link => {
+                                                const isDocs = link.isPopup || link.url.includes('drive.google.com') || link.url.includes('docs.google.com') || link.url.toLowerCase().includes('.pdf') || link.label.toLowerCase().includes('catalogue') || link.label.toLowerCase().includes('catelogue');
+
+                                                const content = (
+                                                    <div className="flex items-start gap-4 h-full">
+                                                        <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+                                                            <div>
+                                                                <h5 className="text-sm font-bold text-[#0E5858] group-hover/link:text-[#00B6C1] transition-colors line-clamp-1">{link.label}</h5>
+                                                                {link.subtitle ? (
+                                                                    <div className="mt-2 p-3 bg-[#FAFCEE] rounded-xl border border-[#00B6C1]/10">
+                                                                        <p className="text-[11px] text-[#0E5858] leading-relaxed italic font-medium">
+                                                                            <span className="text-[9px] font-black text-[#00B6C1] uppercase tracking-widest block mb-1">Mentor Note</span>
+                                                                            {link.subtitle}
+                                                                        </p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed line-clamp-2">
+                                                                        {link.isCopyOnly ? 'Click this button to copy the ID.' : 'Essential resource link required for your training journey.'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            {link.isCopyOnly && copiedId === link.url && (
+                                                                <div className="mt-3 text-[#E1306C] text-[10px] font-bold uppercase flex items-center gap-1 opacity-0 animate-in fade-in duration-300">
+                                                                    <CheckCircle size={12} /> Copied to clipboard!
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        {link.label}
+                                                        <div className={`mt-1 shrink-0 ${link.isCopyOnly ? 'text-[#E1306C] bg-[#E1306C]/10 p-2 rounded-full' : 'text-[#00B6C1]'} transition-transform group-hover/link:scale-110`}>
+                                                            {link.isCopyOnly ? <Copy size={16} /> : <ArrowUpRight size={16} />}
+                                                        </div>
                                                     </div>
-                                                    <ArrowUpRight size={14} className="opacity-0 group-hover/link:opacity-100 transition-opacity text-[#00B6C1]" />
-                                                </a>
-                                            ))}
+                                                );
+
+                                                if (link.isCopyOnly) {
+                                                    return (
+                                                        <button
+                                                            key={link.label}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                navigator.clipboard.writeText(link.url);
+                                                                setCopiedId(link.url);
+                                                                setTimeout(() => setCopiedId(null), 2000);
+                                                                logActivity('copy_id', { topicCode: topic.code, contentTitle: link.label });
+                                                            }}
+                                                            className="group/link text-left flex flex-col justify-between p-5 bg-white shadow-sm hover:shadow-xl rounded-3xl border border-[#0E5858]/5 hover:border-[#E1306C]/30 transition-all gap-4"
+                                                        >
+                                                            {content}
+                                                        </button>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <a
+                                                        key={link.label}
+                                                        href={isDocs ? undefined : link.url}
+                                                        target={isDocs ? undefined : "_blank"}
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => {
+                                                            if (isDocs) {
+                                                                e.preventDefault();
+                                                                setSelectedDocument({ url: link.url, label: link.label });
+                                                            }
+                                                            logActivity('click_link', { topicCode: topic.code, contentTitle: link.label });
+                                                        }}
+                                                        className="group/link flex flex-col justify-between p-5 bg-white shadow-sm hover:shadow-xl rounded-3xl border border-[#0E5858]/5 hover:border-[#00B6C1]/30 transition-all gap-4"
+                                                    >
+                                                        {content}
+                                                    </a>
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -511,22 +990,6 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                     <div className="space-y-12">
                         {/* PHASE 1: MATERIAL CONSUMPTION / RESEARCH */}
                         <div className="max-w-5xl">
-                            {!topic.isAssignment && (
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-xl transition-transform ${videoCompleted ? 'bg-green-500 shadow-green-500/10' : 'bg-[#00B6C1] shadow-[#00B6C1]/20'}`}>
-                                        {videoCompleted ? <CheckCircle size={20} /> : <BookOpen size={20} />}
-                                    </div>
-                                    <div>
-                                        <h4 className="text-lg font-serif text-[#0E5858]">
-                                            {topic.caseStudyLinks ? 'Case Study Repository' : 'Material Review'}
-                                        </h4>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                            {topic.caseStudyLinks ? 'Select a case study to analyze' : 'Complete this to unlock simulations'}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
                             {/* Case Study Grid OR Video/Mark as Read OR Assignment Resources OR Practice Booking */}
                             {topic.isBooking ? (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
@@ -655,35 +1118,93 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                         Initialize Audit Matrix
                                     </button>
                                 </div>
-                            ) : topic.caseStudyLinks ? (
-                                <div className="space-y-8">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                        {topic.caseStudyLinks.map((link, i) => (
-                                            <motion.div
-                                                key={i}
-                                                whileHover={{ y: -5, scale: 1.02 }}
-                                                onClick={() => {
-                                                    setSelectedCaseStudy(link);
-                                                    logActivity('view_case_study', { topicCode: topic.code, contentTitle: `Case Study #${i + 1}` });
-                                                }}
-                                                className="aspect-[4/5] bg-[#FAFCEE] border border-[#0E5858]/5 rounded-2xl p-4 flex flex-col justify-between cursor-pointer group/case shadow-sm hover:shadow-xl hover:bg-white transition-all overflow-hidden relative"
-                                            >
-                                                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover/case:opacity-100 transition-opacity">
-                                                    <Maximize2 size={12} className="text-[#00B6C1]" />
-                                                </div>
-                                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#00B6C1] shadow-sm transform group-hover/case:rotate-12 transition-transform">
-                                                    <FileText size={20} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-[0.2em] mb-1">Case study</p>
-                                                    <p className="text-xs font-bold text-[#0E5858] leading-tight">Patient Journal #{String(i + 1).padStart(2, '0')}</p>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-                                    </div>
-                                    {/* Intermediate confirmation removed as per user request */}
+                            ) : topic.isAssignment ? (
+                                <div id={`assignment-${topic.code}`} className="mt-8 animate-in fade-in slide-in-from-bottom-10 duration-700">
+                                    <AssignmentForm
+                                        topicCode={topic.code}
+                                        questions={topic.assignmentQuestions || []}
+                                        persona={topic.persona}
+                                        userId={userId}
+                                        onComplete={() => setAssignmentCompleted(true)}
+                                    />
                                 </div>
-                            ) : embedUrl ? (
+                            ) : (topic.caseStudies || topic.caseStudyLinks) ? (
+                                <div className="space-y-10">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                                        {(topic.caseStudies || topic.caseStudyLinks?.map((l, i) => ({ label: `Patient Journal #${String(i + 1).padStart(2, '0')}`, url: l })) || [])
+                                            .slice(0, showAllCaseStudies ? undefined : 8)
+                                            .map((cs: any, i: number) => {
+                                            const thumbnail = cs.thumbnail || getSlideThumbnail(cs.url);
+                                            
+                                            return (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: i * 0.05 }}
+                                                    whileHover={{ y: -10, scale: 1.02 }}
+                                                    onClick={() => {
+                                                        setSelectedCaseStudy(cs.url);
+                                                        logActivity('view_case_study', { topicCode: topic.code, contentTitle: cs.label });
+                                                    }}
+                                                    className="group/case aspect-[4/5] bg-white border border-[#0E5858]/10 rounded-[2.5rem] flex flex-col cursor-pointer shadow-md hover:shadow-2xl transition-all duration-500 overflow-hidden relative"
+                                                >
+                                                    {/* Thumbnail / Image Area - ZOOMED PREVIEW */}
+                                                    <div className="flex-1 bg-[#FAFCEE] relative overflow-hidden flex items-center justify-center">
+                                                        {thumbnail ? (
+                                                            <div className="w-full h-full overflow-hidden">
+                                                                <img 
+                                                                    src={thumbnail} 
+                                                                    alt={cs.label} 
+                                                                    className="w-full h-full object-cover object-[70%_50%] origin-right scale-[1.55] group-hover/case:scale-[1.8] transition-transform duration-1000 ease-out"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-14 h-14 bg-white rounded-[1.5rem] flex items-center justify-center text-[#00B6C1] shadow-sm transform group-hover/case:rotate-12 transition-transform">
+                                                                <FileText size={28} />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-[#0E5858]/40 via-transparent to-transparent opacity-60 group-hover/case:opacity-80 transition-opacity" />
+                                                        
+                                                        {/* Floating Play Indicator */}
+                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/case:opacity-100 transition-opacity duration-500">
+                                                            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
+                                                                <Maximize2 size={20} className="text-white" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Footer / Label */}
+                                                    <div className="p-6 bg-white relative">
+                                                        <div className="absolute -top-3 left-6 px-3 py-1 bg-[#00B6C1] text-white text-[8px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                                                            Lead case study
+                                                        </div>
+                                                        <p className="text-[14px] font-bold text-[#0E5858] leading-tight line-clamp-2 mt-2 min-h-[40px] flex items-center">{cs.label}</p>
+                                                        <p className="text-[10px] font-medium text-gray-400 mt-2 flex items-center gap-1.5 font-serif italic">
+                                                            View Clinical Journal →
+                                                        </p>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {(topic.caseStudies?.length || 0) > 8 && (
+                                        <div className="flex justify-center pt-4">
+                                            <button
+                                                onClick={() => setShowAllCaseStudies(!showAllCaseStudies)}
+                                                className="group flex items-center gap-3 px-8 py-3 bg-[#FAFCEE] hover:bg-[#0E5858] text-[#0E5858] hover:text-white rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-sm hover:shadow-xl border border-[#0E5858]/10"
+                                            >
+                                                {showAllCaseStudies ? (
+                                                    <>Show Less <ChevronUp size={16} /></>
+                                                ) : (
+                                                    <>Load More Case Studies ({topic.caseStudies!.length - 8} more) <ChevronDown size={16} /></>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (embedUrl && topic.layout !== 'grid') ? (
                                 <div className={`transition-all duration-700 ${videoCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}>
                                     <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-gray-100 ring-1 ring-black/[0.03]">
                                         {embedUrl.includes('youtube.com') ? (
@@ -697,47 +1218,62 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                             />
                                         )}
                                     </div>
-                                    {/* Intermediate confirmation removed */}
                                 </div>
                             ) : null}
-                        </div>
-
-                        {/* PHASE 2: INTERACTION (ONLY IF APPLICABLE) */}
-                        {(topic.hasLive || topic.isAssignment) && (
-                            <div
-                                id={`assignment-${topic.code}`}
-                                className={`${videoCompleted ? "opacity-100" : (topic.isAssignment ? "opacity-0 h-0 overflow-hidden" : "opacity-40 blur-[4px] pointer-events-none grayscale select-none")} transition-all duration-1000 max-w-5xl`}
-                            >
-                                {!topic.isAssignment && (
-                                    <div className="flex items-center gap-4 mb-8">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-xl ${simulationCompleted || assignmentCompleted ? 'bg-green-500 shadow-green-500/10' : 'bg-purple-500 shadow-purple-500/20'}`}>
-                                            {topic.hasLive ? <User size={20} /> : <Activity size={20} />}
-                                        </div>
-                                        <div>
-                                            <h4 className="text-lg font-serif text-[#0E5858]">{topic.hasLive ? 'Practice Simulation' : 'Analytical Research Task'}</h4>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Practical Implementation Phase</p>
-                                        </div>
+            {/* AI Simulation Overlay - CENTERED LARGE MODAL */}
+            <AnimatePresence>
+                {showSimulation && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[300] bg-[#0E5858]/95 backdrop-blur-3xl flex items-center justify-center p-4 lg:p-12"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            className="w-full max-w-4xl h-[85vh] bg-white rounded-[3rem] shadow-4xl overflow-hidden flex flex-col relative border border-white/20"
+                        >
+                            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-[#0E5858] text-white flex items-center justify-center shadow-xl">
+                                        <BrainCircuit size={32} />
                                     </div>
-                                )}
-
-                                <div className="p-8 bg-gradient-to-br from-white to-[#FAFCEE]/30 rounded-[3rem] border border-[#0E5858]/5 shadow-2xl relative overflow-hidden">
-                                    {topic.hasLive ? (
-                                        <>
-                                            <AcademySimulator topicTitle={topic.title} topicContent={topic.content} topicCode={topic.code} />
-                                            {/* Intermediate confirmation removed */}
-                                        </>
-                                    ) : (
-                                        <AssignmentForm
-                                            topicCode={topic.code}
-                                            questions={topic.assignmentQuestions || []}
-                                            persona={topic.persona}
-                                            onComplete={() => setAssignmentCompleted(true)}
-                                            userId={userId}
-                                        />
-                                    )}
+                                    <div>
+                                        <h3 className="text-2xl font-serif text-[#0E5858]">Protocol Proficiency Hub</h3>
+                                        <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest">Live Client Simulation</p>
+                                    </div>
                                 </div>
+                                <button
+                                    onClick={() => {
+                                        setShowSimulation(false);
+                                        setSimulationCompleted(true);
+                                    }}
+                                    className="w-12 h-12 bg-white hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-2xl flex items-center justify-center transition-all shadow-sm border border-gray-100"
+                                >
+                                    <X size={24} />
+                                </button>
                             </div>
-                        )}
+                            
+                            <div className="flex-1 overflow-hidden">
+                                <AcademySimulator 
+                                    topicTitle={topic.title} 
+                                    topicContent={topic.content} 
+                                    topicCode={topic.code}
+                                    onComplete={() => {
+                                        setSimulationCompleted(true);
+                                        logActivity('complete_simulation', { topicCode: topic.code });
+                                    }} 
+                                />
+                            </div>
+
+                            <div className="p-6 bg-gray-50/50 border-t border-gray-100 text-center">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Complete the interaction to proceed to the next module</p>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
                         {/* FOOTER: THE "MARK COMPLETED" ACTION */}
                         <div className="pt-10 border-t border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -808,6 +1344,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     );
 }
