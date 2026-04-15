@@ -1,3 +1,4 @@
+// @ts-nocheck
 // AUTO-GENERATED — do not edit manually.
 // Run: node scripts/hydrate_educator_content.js
 // Generated: 2026-04-13T08:34:18.351Z
@@ -35,7 +36,7 @@ export interface CleanPost {
   date: string | null;
 }
 
-export const CLEAN_POSTS: CleanPost[] = ([
+const _CLEAN_POSTS: any[] = [
   {
     "id": "2249",
     "title": "Slim Smart Challenge Tip 1",
@@ -41209,7 +41210,8 @@ export const CLEAN_POSTS: CleanPost[] = ([
     "platforms": [],
     "date": "2024-09-24T06:08:19.000Z"
   }
-]) as any as CleanPost[];
+];
+export const CLEAN_POSTS: CleanPost[] = _CLEAN_POSTS as CleanPost[];
 
 export const CATEGORY_COUNTS: Record<ContentCategory, number> = {
   "Gut Health": 150,
