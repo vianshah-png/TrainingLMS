@@ -793,7 +793,7 @@ function AdminDashboardContent() {
                                                     setEditRole(selectedProfile.role || 'counsellor');
                                                     setEditingProfile(!editingProfile);
                                                 }}
-                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${editingProfile ? 'bg-[#C0EB2F] text-[#0E5858] shadow-[#C0EB2F]/30' : 'bg-gray-100 text-gray-500 hover:bg-[#C0EB2F] hover:text-[#0E5858] shadow-gray-200/30'}`}
+                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${editingProfile ? 'bg-[#00B6C1] text-white shadow-[#00B6C1]/30' : 'bg-gray-100 text-gray-500 hover:bg-[#00B6C1] hover:text-white shadow-gray-200/30'}`}
                                                 title="Edit Profile"
                                             >
                                                 <Pencil size={16} />
@@ -1024,9 +1024,9 @@ function AdminDashboardContent() {
                                             <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Joined On</span>
                                             <span className="text-[#0E5858] font-bold text-lg font-serif">{new Date(selectedProfile.created_at || '').toLocaleDateString()}</span>
                                         </div>
-                                        <button className="w-full py-5 bg-[#C0EB2F] text-[#0E5858] rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:brightness-110 transition-all flex flex-col items-center justify-center gap-1 shadow-md shadow-[#C0EB2F]/30">
+                                        <button className="w-full py-5 bg-[#0E5858] text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-[#00B6C1] transition-all flex flex-col items-center justify-center gap-1 shadow-md shadow-[#0E5858]/30">
                                             <div className="flex items-center gap-2"><Share2 size={14} /> Share Activity Report</div>
-                                            <span className="text-[7px] text-[#0E5858]/60 uppercase tracking-[0.2em] font-bold">Sends full performance trail to buddy</span>
+                                            <span className="text-[7px] text-white/60 uppercase tracking-[0.2em] font-bold">Sends full performance trail to buddy</span>
                                         </button>
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-gray-400 font-bold uppercase tracking-widest text-[9px]">Access Level</span>
@@ -1712,196 +1712,7 @@ function AdminDashboardContent() {
                 )}
             </AnimatePresence>
 
-            {/* Profile Modal */}
-            <AnimatePresence>
-                {selectedProfile && (
-                    <div className="fixed inset-0 bg-[#0E5858]/80 backdrop-blur-md z-[100] flex items-center justify-center p-8 overflow-y-auto">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-[#FAFCEE] rounded-[3rem] p-10 max-w-[1300px] w-full shadow-2xl relative my-auto border border-[#0E5858]/10"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            <button onClick={() => setSelectedProfile(null)} className="absolute top-8 right-8 text-gray-400 hover:text-[#0E5858] transition-all z-10">
-                                <XCircle size={32} />
-                            </button>
 
-                            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 h-full min-h-[700px]">
-                                {/* LEFT COLUMN */}
-                                <div className="xl:col-span-3 space-y-6 flex flex-col">
-                                    <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100/50 flex-none relative">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Joined On</p>
-                                            <p className="text-[11px] font-black justify-self-end text-[#0E5858]">{selectedProfile.created_at ? new Date(selectedProfile.created_at).toLocaleDateString() : 'Unknown'}</p>
-                                        </div>
-                                        <button className="w-full py-5 bg-[#C0EB2F] text-[#0E5858] rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:brightness-110 transition-all flex flex-col items-center justify-center gap-1 shadow-md shadow-[#C0EB2F]/30">
-                                            <div className="flex items-center gap-2"><Share2 size={14} /> SHARE ACTIVITY REPORT</div>
-                                            <span className="text-[7px] text-[#0E5858]/60 uppercase tracking-[0.2em] font-bold">Sends full performance trail to buddy</span>
-                                        </button>
-                                        <div className="flex justify-between items-center mt-6">
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Access Level</p>
-                                            <div className="bg-[#E5F7F8] text-[#00B6C1] px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
-                                                {selectedProfile.role.replace('_', ' ')} <Edit2 size={10} />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Danger Zone */}
-                                    <div className="bg-white rounded-[2.5rem] p-8 pb-10 shadow-sm border border-red-50 flex-none text-center relative overflow-hidden">
-                                        <div className="absolute top-0 inset-x-4 h-1 bg-red-100 rounded-b-full"></div>
-                                        <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.3em] mb-6">Danger Zone</p>
-                                        <div className="border border-red-50 bg-red-50/20 rounded-3xl p-6">
-                                            <p className="text-[8px] font-bold text-[#0E5858]/60 uppercase tracking-widest mb-4 leading-relaxed">To delete this account permanently, type "delete account" below.</p>
-                                            <input type="text" placeholder="type 'delete account'" className="w-full bg-white border border-red-100 rounded-xl py-3 px-4 text-xs text-center font-semibold mb-3 outline-none focus:border-red-300 placeholder:text-gray-300" />
-                                            <button className="w-full py-4 bg-gray-50 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 line-through hover:no-underline">
-                                                <Trash2 size={12} /> Permanent Deletion
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <button 
-                                        onClick={() => handleWipeUserHistory(selectedProfile.id)}
-                                        disabled={isWipingUser}
-                                        className="w-full py-5 bg-white border border-red-100 text-red-500 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-red-50 transition-all flex flex-col items-center justify-center shadow-sm"
-                                    >
-                                        <div className="flex items-center gap-2"><Trash2 size={14} /> Clear Activity History</div>
-                                        <span className="text-[7px] font-bold uppercase tracking-[0.2em] text-red-300 mt-1">Resets logs, progress, and scores</span>
-                                    </button>
-
-                                    {/* DISPATCH NOTIFICATION */}
-                                    <div className="bg-[#0D4B4B] rounded-[2.5rem] p-8 shadow-xl flex-1 flex flex-col text-white relative">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <h4 className="text-[11px] font-black text-teal-300 uppercase tracking-[0.3em]">Dispatch Notification</h4>
-                                            <Bell size={16} className="text-teal-500" />
-                                        </div>
-                                        
-                                        <div className="flex flex-wrap gap-2 mb-6">
-                                            {['Inactive', 'Feedback Request', 'Retake Test', 'Trainer Buddy Summary Email'].map(tag => (
-                                                <button key={tag} onClick={() => setDispatchNotif({...dispatchNotif, title: tag})} className={`px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest transition-all ${dispatchNotif.title.includes(tag) ? 'bg-teal-500 border-teal-400 text-white' : 'bg-[#156060] border-teal-900/50 text-teal-400 hover:bg-[#1A7070]'}`}>
-                                                    {tag}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="bg-[#0B3D3D] rounded-xl px-4 py-2 border border-[#156060] flex items-center gap-3 mb-6">
-                                            <span className="text-[7px] font-black text-teal-600 uppercase tracking-widest">Active Protocol:</span>
-                                            <span className="text-[8px] font-black text-teal-300 uppercase tracking-[0.2em]">None</span>
-                                        </div>
-
-                                        <div className="space-y-4 flex-1 flex flex-col">
-                                            <div>
-                                                <p className="text-[8px] font-black text-teal-500 uppercase tracking-widest mb-1.5 ml-1">Notification Title</p>
-                                                <input value={dispatchNotif.title} onChange={e => setDispatchNotif({...dispatchNotif, title: e.target.value})} type="text" placeholder="Enter title..." className="w-full bg-[#156060] border border-teal-900/50 rounded-xl py-3 px-4 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-teal-700 transition-all text-white" />
-                                            </div>
-                                            <div className="flex-1 flex flex-col">
-                                                <p className="text-[8px] font-black text-teal-500 uppercase tracking-widest mb-1.5 ml-1">Message Body</p>
-                                                <textarea value={dispatchNotif.message} onChange={e => setDispatchNotif({...dispatchNotif, message: e.target.value})} placeholder="Type your message here..." className="w-full bg-[#156060] border border-teal-900/50 rounded-2xl py-3 px-4 text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-teal-700 transition-all text-white flex-1 resize-none min-h-[100px]" />
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 mt-6 mb-4">
-                                            {['info', 'warning', 'alert'].map(type => (
-                                                <button key={type} onClick={() => setDispatchNotif({...dispatchNotif, type})} className={`px-4 py-1.5 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-all ${dispatchNotif.type === type ? 'bg-[#00B6C1] border-[#00B6C1] text-white shadow-lg shadow-[#00B6C1]/20' : 'bg-[#156060] border-teal-900/50 text-teal-500 hover:text-white'}`}>
-                                                    {type}
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-2 mt-auto">
-                                            <button onClick={() => handleSendDispatch('dashboard')} disabled={sendingDispatch} className="py-3 bg-[#00B6C1] text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#00B6C1]/20"><Bell size={12}/> Dashboard</button>
-                                            <button onClick={() => handleSendDispatch('email')} disabled={sendingDispatch} className="py-3 bg-[#1A7070] text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-[#208080] transition-all flex items-center justify-center gap-1.5"><Mail size={12}/> Email</button>
-                                            <button onClick={() => handleSendDispatch('whatsapp')} disabled={sendingDispatch} className="py-3 bg-[#1A7070] text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-[#208080] transition-all flex items-center justify-center gap-1.5"><Phone size={12}/> WhatsApp</button>
-                                            <button onClick={() => handleSendDispatch('all')} disabled={sendingDispatch} className="py-3 bg-[#1A7070] text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-[#208080] transition-all flex items-center justify-center gap-1.5"><Sparkles size={12}/> Send All</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* RIGHT COLUMN */}
-                                <div className="xl:col-span-9 space-y-6 flex flex-col">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-1 pl-4 items-center">
-                                         <div>
-                                            <h3 className="text-4xl font-serif text-[#0E5858] font-bold">{selectedProfile.full_name}</h3>
-                                            <p className="text-[11px] font-black text-[#00B6C1] uppercase tracking-[0.2em]">{selectedProfile.role.replace('_', ' ')} • {selectedProfile.email}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* MODULE PROGRESS GRID */}
-                                    <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-gray-100 flex-none">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                                            {syllabusData.filter(m => m.topics && m.topics.length > 0).map((module, mIdx) => {
-                                                const totalTopics = module.topics.length;
-                                                const userProgressForModule = progress.filter(p => p.user_id === selectedProfile.id && p.module_id === module.id);
-                                                const percent = totalTopics > 0 ? Math.round((userProgressForModule.length / totalTopics) * 100) : 0;
-                                                
-                                                return (
-                                                    <div key={module.id} className="space-y-4">
-                                                        <div className="flex justify-between items-end">
-                                                            <div>
-                                                                <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-[0.2em]">Module</p>
-                                                                <p className="text-sm font-serif font-bold text-[#0E5858] truncate pr-4">{module.title}</p>
-                                                            </div>
-                                                            <p className="text-xs font-black text-[#0E5858]">{percent}%</p>
-                                                        </div>
-                                                        <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden flex gap-0.5">
-                                                            {module.topics.map((t, tIdx) => {
-                                                                const completed = userProgressForModule.some(p => p.topic_code === t.code);
-                                                                return (
-                                                                    <div key={t.code} className={`h-full flex-1 rounded-sm ${completed ? 'bg-[#C0EB2F]' : 'bg-gray-100'}`}></div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* AUDIT & FEEDBACK */}
-                                    <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-gray-100 flex-1 flex flex-col">
-                                        <h4 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mb-6 flex items-center gap-3">
-                                            <ClipboardList size={16} className="text-[#00B6C1]" /> Audit & Feedback Repository
-                                        </h4>
-                                        
-                                        <div className="flex-1 overflow-y-auto pr-4 space-y-4">
-                                            {audits.filter(a => a.user_id === selectedProfile.id).length === 0 && assessments.filter(a => a.user_id === selectedProfile.id).length === 0 ? (
-                                                <div className="h-40 flex items-center justify-center border-2 border-dashed border-gray-100 rounded-3xl">
-                                                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">No Audits Logged Yet</p>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {assessments.filter(a => a.user_id === selectedProfile.id).map(a => (
-                                                        <div key={`quiz_${a.id}`} onClick={() => setSelectedQuiz(a)} className="p-6 bg-gray-50 border border-gray-100 rounded-3xl hover:bg-[#FAFCEE] transition-all cursor-pointer group flex items-center justify-between">
-                                                            <div>
-                                                                <div className="flex items-center gap-2 mb-2"><BrainCircuit size={12} className="text-orange-400"/><span className="text-[8px] font-black text-orange-400 uppercase tracking-widest">Assessment Log</span></div>
-                                                                <p className="text-xs font-bold text-[#0E5858] truncate">{a.topic_code}</p>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Score: {Math.round((a.score / (a.total_questions || 5)) * 100)}%</p>
-                                                            </div>
-                                                            <ArrowUpRight size={16} className="text-gray-300 group-hover:text-[#00B6C1]" />
-                                                        </div>
-                                                    ))}
-                                                    {audits.filter(a => a.user_id === selectedProfile.id).map(a => (
-                                                        <div key={`audit_${a.id}`} onClick={() => setSelectedAudit(a)} className="p-6 bg-gray-50 border border-gray-100 rounded-3xl hover:bg-[#FAFCEE] transition-all cursor-pointer group flex items-center justify-between">
-                                                            <div>
-                                                            <div className="flex items-center gap-2 mb-2"><ClipboardList size={12} className="text-[#00B6C1]"/><span className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">Peer Review</span></div>
-                                                                <p className="text-xs font-bold text-[#0E5858] truncate">{a.topic_code}</p>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{new Date(a.created_at).toLocaleDateString()}</p>
-                                                            </div>
-                                                            <ArrowUpRight size={16} className="text-gray-300 group-hover:text-[#00B6C1]" />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* Assessment Detail Modal */}
             <AnimatePresence>
                 {selectedQuiz && (
                     <div className="fixed inset-0 bg-[#0E5858]/80 backdrop-blur-md z-[100] flex items-center justify-center p-8">
