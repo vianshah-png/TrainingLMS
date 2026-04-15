@@ -158,7 +158,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                     counselorName: undefined,
                 }),
             });
-            if (!res.ok) throw new Error('Failed');
+            if (!res.ok) throw new DOMException('Mock call email delivery failed', 'NetworkError');
             setEmailStatus(prev => ({ ...prev, [key]: 'sent' }));
             setTimeout(() => setEmailStatus(prev => ({ ...prev, [key]: 'idle' })), 4000);
         } catch {

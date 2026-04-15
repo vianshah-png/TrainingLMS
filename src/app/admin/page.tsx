@@ -251,7 +251,7 @@ function AdminDashboardContent() {
             const res = await fetch('/api/admin/dashboard-sync', {
                 headers: { 'Authorization': `Bearer ${session.access_token}` }
             });
-            if (!res.ok) throw new Error("Dashboard Sync API failed");
+            if (!res.ok) throw new DOMException("Dashboard Sync API failed", "NetworkError");
             
             const syncData = await res.json();
             
@@ -315,7 +315,7 @@ function AdminDashboardContent() {
             });
 
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Provisioning failed');
+            if (!response.ok) throw new DOMException(data.error || 'Provisioning failed', 'DataError');
 
             setUserSuccess(data.message || `Authorized: ${newUser.email}. Account created.`);
             setNewUser({
@@ -351,7 +351,7 @@ function AdminDashboardContent() {
                 body: JSON.stringify(contentForm),
             });
 
-            if (!response.ok) throw new Error('Architecture synchronization failed');
+            if (!response.ok) throw new DOMException('Architecture synchronization failed', 'DataError');
 
             setContentSuccess("Content Bank synchronized across all nodes.");
             setContentForm({ moduleId: "", topicTitle: "", contentType: "video", contentLink: "" });
@@ -490,7 +490,7 @@ function AdminDashboardContent() {
                 body: JSON.stringify({ userId: selectedProfile.id })
             });
 
-            if (!res.ok) throw new Error("Deletion failed");
+            if (!res.ok) throw new DOMException("Deletion failed", "AbortError");
 
             alert("Account permanently removed.");
             setSelectedProfile(null);
@@ -514,7 +514,7 @@ function AdminDashboardContent() {
                 body: JSON.stringify({ name: newFolderName, prefix: newFolderPrefix })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to create folder");
+            if (!res.ok) throw new DOMException(data.error || "Failed to create folder", "NotAllowedError");
             setNewFolderName("");
             setNewFolderPrefix("");
             setRenamingFolderId(null);
@@ -532,7 +532,7 @@ function AdminDashboardContent() {
                 body: JSON.stringify({ id, name: renameFolderValue })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to rename folder");
+            if (!res.ok) throw new DOMException(data.error || "Failed to rename folder", "NotAllowedError");
             setRenamingFolderId(null);
             refreshData();
         } catch (err: any) { alert(err.message); }
@@ -547,7 +547,7 @@ function AdminDashboardContent() {
                 headers: { 'Authorization': `Bearer ${session?.access_token}` }
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to delete folder");
+            if (!res.ok) throw new DOMException(data.error || "Failed to delete folder", "NotAllowedError");
             refreshData();
         } catch (err: any) { alert(err.message); }
     };
@@ -609,7 +609,7 @@ function AdminDashboardContent() {
                 })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to save quiz");
+            if (!res.ok) throw new DOMException(data.error || "Failed to save quiz", "DataError");
             setQuizSuccess("Masterclass protocols synchronized.");
         } catch (err: any) { setQuizError(err.message); }
         finally { setIsSavingQuiz(false); }
@@ -624,7 +624,7 @@ function AdminDashboardContent() {
                 headers: { 'Authorization': `Bearer ${session?.access_token}` }
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to delete quiz");
+            if (!res.ok) throw new DOMException(data.error || "Failed to delete quiz", "DataError");
             setManualQuizQuestions([]);
             setQuizSuccess("Reverted to baseline AI protocol.");
         } catch (err: any) { alert(err.message); }
@@ -647,7 +647,7 @@ function AdminDashboardContent() {
                 })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to send email");
+            if (!res.ok) throw new DOMException(data.error || "Failed to send email", "NetworkError");
             
             setEmailModal(null);
             setEmailForm({subject: '', message: ''});
@@ -667,7 +667,7 @@ function AdminDashboardContent() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
                 body: JSON.stringify({ userId })
             });
-            if (!res.ok) throw new Error("Failed to clear user history");
+            if (!res.ok) throw new DOMException("Failed to clear user history", "SecurityError");
             alert("User history cleared successfully!");
             refreshData();
             setSelectedProfile(null); 
