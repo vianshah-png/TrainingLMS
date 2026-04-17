@@ -29,18 +29,29 @@ import { syllabusData } from "@/data/syllabus";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { getAccessibleModuleIds } from "@/lib/moduleAccess";
+import EducatorsDiscovery from "@/components/EducatorsDiscovery";
 
 export default function Home() {
   const router = useRouter();
   const [completedModules, setCompletedModules] = useState<string[]>([]);
   const [userStats, setUserStats] = useState({ progress: 0, avgScore: 0, quizzes: 0 });
   const [lastModule, setLastModule] = useState<{ id: string; title: string } | null>(null);
+  const [lastTopicCode, setLastTopicCode] = useState<string | null>(null);
+  const [completedTopicCodesSet, setCompletedTopicCodesSet] = useState<Set<string>>(new Set());
+  const [totalAssignedSegments, setTotalAssignedSegments] = useState(0);
+  const [completedSegments, setCompletedSegments] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [trainingBuddy, setTrainingBuddy] = useState<string>("");
   const [dynamicContent, setDynamicContent] = useState<any[]>([]);
   const [allMentors, setAllMentors] = useState<any[]>([]);
   const [showBuddyModal, setShowBuddyModal] = useState(false);
+  const [userRole, setUserRole] = useState<string>("counsellor");
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
+  const [accessibleModuleIds, setAccessibleModuleIds] = useState<string[]>([]);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [isTrainingComplete, setIsTrainingComplete] = useState(false);
 
   useEffect(() => {
     const fetchPersonalStats = async () => {
@@ -67,6 +78,20 @@ export default function Home() {
         setTrainingBuddy(profile.training_buddy);
       }
 
+      // 0b. Fetch role & allowed_modules for module access control
+      const { data: fullProfile } = await supabase
+        .from('profiles')
+        .select('role, allowed_modules')
+        .eq('id', session.user.id)
+        .single();
+
+      const role = fullProfile?.role || 'counsellor';
+      const modules = fullProfile?.allowed_modules || [];
+      setUserRole(role);
+      setAllowedModules(modules);
+      const accessIds = getAccessibleModuleIds(role, modules);
+      setAccessibleModuleIds(accessIds);
+
       // 1. Fetch Dynamic Content Metadata (to count total topics)
       const { data: dynContent, error: dynError } = await supabase
         .from('syllabus_content')
@@ -91,12 +116,17 @@ export default function Home() {
         .select('topic_code')
         .eq('user_id', session.user.id);
 
-      const completedTopicCodes = new Set(topicProgress?.map(p => p.topic_code) || []);
+      const assessmentTopicCodes = assessments?.map(a => a.topic_code) || [];
+      const progressTopicCodes = topicProgress?.map(p => p.topic_code) || [];
+      
+      // Merge both sources: manual completion + quiz/assessment completion
+      const completedTopicCodes = new Set([...progressTopicCodes, ...assessmentTopicCodes]);
       const dbCompletedModules: string[] = [];
       const dynamicArray = dynContent || [];
 
       // Calculate which modules are done based on syllabus (static) + dynamic topics
-      syllabusData.filter(m => m.id !== 'resource-bank').forEach(module => {
+      // Only consider modules the user can access
+      syllabusData.filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id)).forEach(module => {
         const dynamicForModule = dynamicArray.filter(d => d.module_id === module.id);
 
         const staticTopicsDone = module.topics.every(t => completedTopicCodes.has(t.code));
@@ -111,15 +141,24 @@ export default function Home() {
 
       setCompletedModules(dbCompletedModules);
 
-      // Total Topics = Static Syllabus + Dynamic Content
+      // Total Topics = Static Syllabus + Dynamic Content (only accessible modules)
       const totalStaticTopics = syllabusData
-        .filter(m => m.id !== 'resource-bank')
+        .filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id))
         .reduce((acc, m) => acc + m.topics.length, 0);
-      const totalTopics = totalStaticTopics + dynamicCount;
 
-      const validCodesSet = new Set(syllabusData.filter(m => m.id !== 'resource-bank').flatMap(m => m.topics.map(t => t.code)));
+      const validCodesSet = new Set(syllabusData.filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id)).flatMap(m => m.topics.map(t => t.code)));
+      // Also add dynamic topic codes as valid
+      const dynamicAccessibleForCount = (dynContent || []).filter(d => accessIds.includes(d.module_id));
+      dynamicAccessibleForCount.forEach(d => validCodesSet.add(`DYN-${d.id}`));
+      
+      const totalTopics = totalStaticTopics + dynamicAccessibleForCount.length;
       const filteredCompletedCount = Array.from(completedTopicCodes).filter(code => validCodesSet.has(code)).length;
       const compositeProgress = totalTopics > 0 ? Math.round((filteredCompletedCount / totalTopics) * 100) : 0;
+
+      // Store for use in JSX (per-module progress bars, segment label)
+      setCompletedTopicCodesSet(completedTopicCodes);
+      setTotalAssignedSegments(totalTopics);
+      setCompletedSegments(filteredCompletedCount);
 
       if (assessments && assessments.length > 0) {
         const avgScore = Math.round((assessments.reduce((acc: number, curr: any) => acc + (curr.score / curr.total_questions), 0) / assessments.length) * 100);
@@ -180,7 +219,7 @@ export default function Home() {
       // 5. Fetch Last Activity to determine Resume Module
       const { data: lastLog, error: logError } = await supabase
         .from('mentor_activity_logs')
-        .select('module_id')
+        .select('module_id, content_title, topic_code')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -192,22 +231,77 @@ export default function Home() {
       }
 
       let targetModule = null;
+      let resumeTopicCode: string | null = null;
       if (lastLog?.module_id && lastLog.module_id !== 'System') {
         const mod = syllabusData.find(m => m.id === lastLog.module_id);
-        if (mod) targetModule = { id: mod.id, title: mod.title };
+        if (mod && accessIds.includes(mod.id)) {
+          targetModule = { id: mod.id, title: mod.title };
+          if (lastLog.topic_code) {
+             resumeTopicCode = lastLog.topic_code;
+          } else if (lastLog.content_title) {
+             // fallback
+             const topicMatch = lastLog.content_title.match(/^([A-Z0-9]+-\d+)/);  
+             if (topicMatch) resumeTopicCode = topicMatch[1];
+          }
+        }
       }
 
-      // If no activity or invalid module, find first incomplete module
+      // If no activity or invalid module, find first incomplete module + first incomplete topic
       if (!targetModule) {
-        const firstIncomplete = syllabusData.find(m => !dbCompletedModules.includes(m.id));
+        const firstIncomplete = syllabusData
+          .filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id))
+          .find(m => !dbCompletedModules.includes(m.id));
         if (firstIncomplete) {
           targetModule = { id: firstIncomplete.id, title: firstIncomplete.title };
+          // Find first incomplete topic in this module
+          const firstIncompleteTopic = firstIncomplete.topics.find(t => !completedTopicCodes.has(t.code));
+          if (firstIncompleteTopic) resumeTopicCode = firstIncompleteTopic.code;
         } else {
           // All complete? Link to first
           targetModule = { id: syllabusData[0].id, title: syllabusData[0].title };
         }
       }
       setLastModule(targetModule);
+      setLastTopicCode(resumeTopicCode);
+
+      // Check if threshold (80%) of accessible modules are completed -> show Educators Discovery
+      const totalStaticAccessible = syllabusData
+        .filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id))
+        .reduce((acc, m) => acc + m.topics.length, 0);
+      
+      const finishedStaticAccessible = syllabusData
+        .filter(m => m.id !== 'resource-bank' && accessIds.includes(m.id))
+        .reduce((acc, m) => {
+          const done = m.topics.filter(t => completedTopicCodes.has(t.code)).length;
+          return acc + done;
+        }, 0);
+
+      const dynamicAccessible = dynamicArray.filter(d => accessIds.includes(d.module_id));
+      const finishedDynamicAccessible = dynamicAccessible.filter(d => completedTopicCodes.has(`DYN-${d.id}`)).length;
+
+      const totalAssignedTopics = totalStaticAccessible + dynamicAccessible.length;
+      const totalFinishedAssigned = finishedStaticAccessible + finishedDynamicAccessible;
+
+      const assignedProgressPercent = totalAssignedTopics > 0 ? (totalFinishedAssigned / totalAssignedTopics) : 0;
+
+      if (assignedProgressPercent >= 0.8 && totalAssignedTopics > 0) {
+        setIsTrainingComplete(true);
+
+        // Check if we arrived here from a quiz redirect (pending flag)
+        const pending = localStorage.getItem('educators_discovery_pending');
+        if (pending) {
+          // First time after completing last quiz — always show, clear the flag
+          localStorage.removeItem('educators_discovery_pending');
+          localStorage.removeItem('educators_discovery_dismissed');
+          setShowDiscovery(true);
+        } else {
+          // Returning visits — only show if not dismissed
+          const dismissed = localStorage.getItem('educators_discovery_dismissed');
+          if (!dismissed) {
+            setShowDiscovery(true);
+          }
+        }
+      }
 
       setLoading(false);
     };
@@ -314,10 +408,14 @@ export default function Home() {
                 </div>
                 <h2 className="text-5xl lg:text-6xl font-serif mb-6 leading-tight">Master the Art of <br />Counselling</h2>
                 <button
-                  onClick={() => router.push(`/modules/${lastModule?.id || 'module-1'}`)}
+                  onClick={() => {
+                    const base = `/modules/${lastModule?.id || 'module-1'}`;
+                    const hash = lastTopicCode ? `#topic-${lastTopicCode}` : '';
+                    router.push(`${base}${hash}`);
+                  }}
                   className="px-8 py-4 bg-[#00B6C1] text-[#0E5858] rounded-2xl font-bold shadow-2xl hover:bg-white transition-all flex items-center gap-3 group/btn"
                 >
-                  {completedModules.includes(lastModule?.id || '') ? 'Review' : 'Resume'} {lastModule?.title || 'Training'}
+                  {completedModules.includes(lastModule?.id || '') ? 'Review' : 'Resume'} {lastModule?.title.replace(/^Module \d+:\s*/i, '') || 'Training'}
                   <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -329,7 +427,8 @@ export default function Home() {
                     <h3 className="text-4xl font-serif">{userStats.progress}%</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest">{completedModules.length}/{syllabusData.filter(m => m.id !== 'resource-bank').length} Modules</p>
+                    <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-widest">{completedSegments} of {totalAssignedSegments} Segments</p>
+                    <p className="text-[9px] font-bold text-white/40 mt-0.5">{completedModules.length}/{syllabusData.filter(m => m.id !== 'resource-bank' && accessibleModuleIds.includes(m.id)).length} Modules Done</p>
                   </div>
                 </div>
                 <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-8">
@@ -401,7 +500,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {syllabusData.filter(m => m.id !== 'resource-bank').map((module, index) => {
+            {syllabusData.filter(m => m.id !== 'resource-bank' && accessibleModuleIds.includes(m.id)).map((module, index) => {
               const isCompleted = completedModules.includes(module.id);
               return (
                 <motion.div
@@ -423,58 +522,78 @@ export default function Home() {
                     </div>
 
                     <h4 className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-2">Module {index + 1}</h4>
-                    <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">{module.title}</h3>
+                    <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">{module.title.replace(/^Module \d+:\s*/i, '')}</h3>
                     <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">{module.description}</p>
                   </div>
 
-                  <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-4 text-[10px] font-bold text-gray-300">
-                      <span className="flex items-center gap-1.5">
-                        <ListChecks size={12} />
-                        {module.topics.length + (dynamicContent.filter((d: any) => d.module_id === module.id).length || 0)} Sections
-                      </span>
-                    </div>
-                    <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-[#00B6C1] group-hover:border-transparent group-hover:text-white transition-all">
-                      <ArrowRight size={14} />
-                    </div>
-                  </div>
+                  {/* Per-module mini progress bar */}
+                  {(() => {
+                    const dynForMod = dynamicContent.filter((d: any) => d.module_id === module.id);
+                    const totalSegments = module.topics.length + dynForMod.length;
+                    const doneSegments = module.topics.filter(t => completedTopicCodesSet.has(t.code)).length
+                      + dynForMod.filter((d: any) => completedTopicCodesSet.has(`DYN-${d.id}`)).length;
+                    const pct = totalSegments > 0 ? Math.round((doneSegments / totalSegments) * 100) : 0;
+                    return (
+                      <div className="pt-5 border-t border-gray-50 mt-auto">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-4 text-[10px] font-bold text-gray-300">
+                            <span className="flex items-center gap-1.5">
+                              <ListChecks size={12} />
+                              {doneSegments}/{totalSegments} Segments
+                            </span>
+                          </div>
+                          <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-[#00B6C1] group-hover:border-transparent group-hover:text-white transition-all">
+                            <ArrowRight size={14} />
+                          </div>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#00B6C1] to-[#0E5858] rounded-full transition-all duration-700"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               );
             })}
             
             {/* Educator Hub Shortcut */}
-            <motion.div
-              whileHover={{ y: -8 }}
-              onClick={() => router.push(`/educators`)}
-              className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-transparent hover:border-[#00B6C1]/20 transition-all cursor-pointer group flex flex-col h-[340px]"
-            >
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-5">
-                  <div className="w-14 h-14 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] group-hover:bg-[#0E5858] group-hover:text-white transition-all duration-500">
-                    <Sparkles size={24} />
+            {isTrainingComplete && (
+              <motion.div
+                whileHover={{ y: -8 }}
+                onClick={() => router.push(`/educators`)}
+                className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-transparent hover:border-[#00B6C1]/20 transition-all cursor-pointer group flex flex-col h-[340px]"
+              >
+                <div className="flex-1">
+                  <div className="flex justify-between items-start mb-5">
+                    <div className="w-14 h-14 bg-[#FAFCEE] rounded-2xl flex items-center justify-center text-[#0E5858] group-hover:bg-[#0E5858] group-hover:text-white transition-all duration-500">
+                      <Sparkles size={24} />
+                    </div>
+                    <div className="px-3 py-1 bg-[#0E5858] text-white rounded-full text-[8px] font-black uppercase tracking-widest border border-[#0E5858] flex items-center gap-1">
+                      NEW
+                    </div>
                   </div>
-                  <div className="px-3 py-1 bg-[#0E5858] text-white rounded-full text-[8px] font-black uppercase tracking-widest border border-[#0E5858] flex items-center gap-1">
-                    NEW
-                  </div>
+
+                  <h4 className="text-[10px] font-black text-[#0E5858] uppercase tracking-[0.3em] mb-2">Educators</h4>
+                  <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">Educators Module</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">Search across all videos, blogs, success stories, and protocols mapped to health conditions using our semantic engine.</p>
                 </div>
 
-                <h4 className="text-[10px] font-black text-[#0E5858] uppercase tracking-[0.3em] mb-2">Educators</h4>
-                <h3 className="text-lg font-serif text-[#0E5858] mb-3 group-hover:text-[#00B6C1] transition-colors leading-snug line-clamp-2">Educators Module</h3>
-                <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">Search across all videos, blogs, success stories, and protocols mapped to health conditions using our semantic engine.</p>
-              </div>
-
-              <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
-                <div className="flex items-center gap-4 text-[10px] font-bold text-[#00B6C1]">
-                  <span className="flex items-center gap-1.5">
-                    <Layers size={12} />
-                    RAG Search
-                  </span>
+                <div className="pt-5 border-t border-gray-50 flex items-center justify-between mt-auto">
+                  <div className="flex items-center gap-4 text-[10px] font-bold text-[#00B6C1]">
+                    <span className="flex items-center gap-1.5">
+                      <Layers size={12} />
+                      RAG Search
+                    </span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-[#00B6C1] group-hover:border-transparent group-hover:text-white transition-all">
+                    <ArrowRight size={14} />
+                  </div>
                 </div>
-                <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-[#00B6C1] group-hover:border-transparent group-hover:text-white transition-all">
-                  <ArrowRight size={14} />
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </div>
         </motion.section>
 
@@ -538,6 +657,21 @@ export default function Home() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Educators Discovery Screen */}
+        {showDiscovery && (
+          <EducatorsDiscovery
+            onDismiss={() => {
+              setShowDiscovery(false);
+              localStorage.setItem('educators_discovery_dismissed', 'true');
+            }}
+            onExplore={() => {
+              setShowDiscovery(false);
+              localStorage.setItem('educators_discovery_dismissed', 'true');
+              router.push('/educators');
+            }}
+          />
+        )}
       </motion.div>
     </main>
   );

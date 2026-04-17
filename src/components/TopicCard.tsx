@@ -197,6 +197,11 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
             setSimulationCompleted(true);
             setAssignmentCompleted(true);
         }
+
+        // Log viewing activity
+        if (topic.code) {
+            logActivity('view_topic', { topicCode: topic.code, contentTitle: topic.title });
+        }
     }, [topic.code, isCompleted, userId]);
 
     useEffect(() => {
@@ -728,7 +733,7 @@ export default function TopicCard({ topic, index, isCompleted, onToggleComplete,
                                                                 <iframe
                                                                     src={getEmbedUrl(link.url) || link.url}
                                                                     className="w-full h-full border-0"
-                                                                    allow="autoplay; fullscreen"
+                                                                    allow="fullscreen"
                                                                 />
                                                             </div>
                                                         ) : (

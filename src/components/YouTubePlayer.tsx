@@ -30,8 +30,8 @@ export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTit
             if (window.YT && window.YT.Player) {
                 if (playerRef.current) {
                     // Update existing player
-                    if (playerRef.current.loadVideoById) {
-                        playerRef.current.loadVideoById(videoId);
+                    if (playerRef.current.cueVideoById) {
+                        playerRef.current.cueVideoById(videoId);
                     }
                 } else {
                     createPlayer();
@@ -80,7 +80,8 @@ export default function YouTubePlayer({ videoId, onComplete, topicCode, topicTit
                     playerVars: {
                         'playsinline': 1,
                         'modestbranding': 1,
-                        'rel': 0
+                        'rel': 0,
+                        'autoplay': 0
                     },
                     events: {
                         'onStateChange': onPlayerStateChange

@@ -56,9 +56,14 @@ export default function QuizProtocolEditor({
                         }}
                         className="bg-gray-50 border border-[#0E5858]/10 rounded-xl py-3 px-6 text-sm font-bold outline-none focus:ring-2 focus:ring-[#00B6C1]/10 min-w-[280px]"
                     >
-                        <option value="">Select Module to Edit Quiz</option>
-                        {syllabusData.filter(m => m.topics.length > 0).map(m => (
-                            <option key={m.id} value={`MODULE_${m.id}`}>{m.title.split(':')[0]} Final Quiz</option>
+                        <option value="">Select Quiz to Edit (Segment or Final)</option>
+                        {syllabusData.filter(m => m.topics && m.topics.length > 0).map(m => (
+                            <optgroup key={m.id} label={m.title}>
+                                {m.topics.map((t: any) => (
+                                    <option key={t.code} value={t.code}>{t.code}: {t.title}</option>
+                                ))}
+                                <option value={`MODULE_${m.id}`}>⭐ {m.title.split(':')[0]} Final Quiz</option>
+                            </optgroup>
                         ))}
                     </select>
                     {isFetchingQuiz && <div className="flex items-center gap-2 px-4 py-1 animate-pulse"><Loader2 size={12} className="animate-spin text-[#00B6C1]" /><span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Loading Protocol...</span></div>}

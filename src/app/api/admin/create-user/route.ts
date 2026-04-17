@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     if (!auth.authorized) return auth.response;
 
     try {
-        const { email, password, fullName, role, trainingBuddy, phone } = await request.json();
+        const { email, password, fullName, role, trainingBuddy, phone, allowedModules } = await request.json();
 
         if (!email || !password || !fullName) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -59,7 +59,8 @@ export async function POST(request: Request) {
                 full_name: fullName,
                 role: role || 'counsellor',
                 training_buddy: trainingBuddy || '[]',
-                temp_password: password
+                temp_password: password,
+                allowed_modules: allowedModules || []
             };
 
             if (phone) profileData.phone = phone;

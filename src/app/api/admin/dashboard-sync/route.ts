@@ -9,11 +9,21 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Missing authorization' }, { status: 401 });
         }
 
-        const token = authHeader.replace('Bearer ', '');
+        // Robust token extraction (case-insensitive "bearer")
+        const token = authHeader.replace(/^Bearer /i, '').trim();
+
+        if (!token) {
+            return NextResponse.json({ error: 'Token is empty' }, { status: 401 });
+        }
+
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
-            return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+            console.error("Supabase Auth Error:", userError?.message || "User not found");
+            return NextResponse.json({
+                error: 'Invalid token',
+                details: userError?.message || 'The provided token was not recognized by the Supabase project.'
+            }, { status: 401 });
         }
 
         const { data: profile } = await supabaseAdmin
@@ -24,7 +34,8 @@ export async function GET(request: Request) {
 
         const ALLOWED_ROLES = ['admin', 'moderator', 'trainer buddy', 'buddy', 'tech', 'bd', 'cs'];
         if (!profile || !ALLOWED_ROLES.includes(profile.role)) {
-            return NextResponse.json({ error: 'Unauthorized role' }, { status: 403 });
+            console.warn(`Access denied for user ${user.id} with role: ${profile?.role}`);
+            return NextResponse.json({ error: 'Unauthorized role', role: profile?.role }, { status: 403 });
         }
 
         const [

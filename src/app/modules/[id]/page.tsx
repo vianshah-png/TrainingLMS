@@ -39,6 +39,7 @@ import AIAssessment from "@/components/AIAssessment";
 import AcademySimulator from "@/components/AcademySimulator";
 import { AnimatePresence } from "framer-motion";
 import { logActivity } from "@/lib/activity";
+import { canAccessModule, getAccessibleModuleIds } from "@/lib/moduleAccess";
 
 function getDocEmbedUrl(url: string | null): string {
     if (!url) return '';
@@ -82,6 +83,8 @@ export default function ModulePage() {
     const [showGymPopup, setShowGymPopup] = useState(false);
     const [loadingContent, setLoadingContent] = useState(true);
     const [selectedDocument, setSelectedDocument] = useState<{ url: string, label: string } | null>(null);
+    const [hasModuleAccess, setHasModuleAccess] = useState(true);
+    const [userAccessibleIds, setUserAccessibleIds] = useState<string[]>([]);
 
     const [isAdmin, setIsAdmin] = useState(false);
     // Admin Edit Mode States
@@ -98,9 +101,28 @@ export default function ModulePage() {
     
     const [healthTab, setHealthTab] = useState<'doctors' | 'pharma'>('doctors');
 
-    // Scroll to top on every module change
+    // Scroll to top on every module change, or to specific topic if hash present
     useEffect(() => {
-        window.scrollTo(0, 0);
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#topic-')) {
+            // Wait for content to render, then scroll to the topic
+            const timer = setTimeout(() => {
+                const el = document.getElementById(hash.substring(1));
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Brief highlight effect
+                    el.style.outline = '3px solid #00B6C1';
+                    el.style.outlineOffset = '8px';
+                    el.style.borderRadius = '24px';
+                    setTimeout(() => { el.style.outline = 'none'; }, 3000);
+                } else {
+                    window.scrollTo(0, 0);
+                }
+            }, 600);
+            return () => clearTimeout(timer);
+        } else {
+            window.scrollTo(0, 0);
+        }
     }, [moduleId]);
 
     const handleTopicEdit = (topicCode: string, updatedFields: Partial<any>) => {
@@ -330,8 +352,26 @@ export default function ModulePage() {
 
             if (session) {
                 setUserId(session.user.id);
-                // Check if user is admin
-                setIsAdmin(session.user.user_metadata?.role === 'admin');
+
+                // Fetch profile for role-based access
+                const { data: userProfile } = await supabase
+                    .from('profiles')
+                    .select('role, allowed_modules')
+                    .eq('id', session.user.id)
+                    .single();
+
+                const role = userProfile?.role || 'counsellor';
+                const allowedMods = userProfile?.allowed_modules || [];
+                setIsAdmin(role === 'admin' || role === 'moderator');
+
+                // Check module access
+                const accessIds = getAccessibleModuleIds(role, allowedMods);
+                setUserAccessibleIds(accessIds);
+                if (!canAccessModule(moduleId, role, allowedMods)) {
+                    setHasModuleAccess(false);
+                    setLoadingContent(false);
+                    return;
+                }
 
                 // 2. Fetch Progress (Module Specific & Overall for Context)
                 const { data: modProgressData } = await supabase
@@ -460,7 +500,7 @@ export default function ModulePage() {
         }
     };
 
-    const visibleSyllabus = syllabusData.filter(m => m.id !== 'resource-bank');
+    const visibleSyllabus = syllabusData.filter(m => m.id !== 'resource-bank' && (userAccessibleIds.length === 0 || userAccessibleIds.includes(m.id)));
     const currentModuleIndex = visibleSyllabus.findIndex(m => m.id === moduleId);
     const prevModule = visibleSyllabus[currentModuleIndex - 1];
     const nextModule = visibleSyllabus[currentModuleIndex + 1];
@@ -511,6 +551,22 @@ export default function ModulePage() {
                 <h1 className="text-4xl font-serif text-[#0E5858] mb-4">Module Out of Reach</h1>
                 <p className="text-gray-400 mb-8 max-w-xs">This curriculum path hasn't been mapped yet.</p>
                 <Link href="/" className="px-8 py-3 bg-[#0E5858] text-white rounded-2xl font-bold shadow-xl">Return to Hub</Link>
+            </main>
+        );
+    }
+
+    if (!hasModuleAccess) {
+        return (
+            <main className="p-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="w-24 h-24 bg-[#FAFCEE] rounded-[2rem] flex items-center justify-center text-[#0E5858]/30 mb-8 border-2 border-[#0E5858]/10">
+                    <BookOpen size={48} />
+                </div>
+                <h1 className="text-4xl font-serif text-[#0E5858] mb-4">Access Restricted</h1>
+                <p className="text-gray-400 mb-3 max-w-md leading-relaxed">Your current role does not include access to <strong className="text-[#0E5858]">{baseModule.title}</strong>.</p>
+                <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-widest mb-8">Contact your admin to request module access</p>
+                <Link href="/" className="px-8 py-4 bg-[#0E5858] text-white rounded-2xl font-bold shadow-xl hover:bg-[#00B6C1] transition-all flex items-center gap-2">
+                    <ArrowRight size={16} className="rotate-180" /> Return to Dashboard
+                </Link>
             </main>
         );
     }
@@ -680,14 +736,10 @@ export default function ModulePage() {
                                 topicCode={`MODULE_${moduleId}`}
                                 onComplete={() => {
                                     setAssessmentPassed(true);
-                                    setTimeout(() => {
-                                        setShowModuleAssessment(false);
-                                        if (nextModule) {
-                                            router.push(`/modules/${nextModule.id}`);
-                                        } else {
-                                            router.push('/');
-                                        }
-                                    }, 2000);
+                                }}
+                                onClose={() => {
+                                    setShowModuleAssessment(false);
+                                    handleContinue();
                                 }}
                             />
                         </motion.div>

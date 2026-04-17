@@ -12,17 +12,29 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
         }
 
-        // Wipe activity
-        await supabaseAdmin.from('mentor_activity_logs').delete().eq('user_id', userId);
-        
-        // Wipe quizzes
-        await supabaseAdmin.from('assessment_logs').delete().eq('user_id', userId);
-        
-        // Wipe progress
-        await supabaseAdmin.from('mentor_progress').delete().eq('user_id', userId);
-        
-        // Wipe peer reviews (audits)
-        await supabaseAdmin.from('summary_audits').delete().eq('user_id', userId);
+        // Tables to wipe for a fresh start
+        const tables = [
+            'mentor_activity_logs',
+            'assessment_logs',
+            'mentor_progress',
+            'summary_audits',
+            'simulation_logs',
+            'certification_attempts',
+            'notifications'
+        ];
+
+        for (const table of tables) {
+            await supabaseAdmin.from(table).delete().eq('user_id', userId);
+        }
+
+        // Start fresh activity trail with a "Fresh Start" marker
+        await supabaseAdmin.from('mentor_activity_logs').insert([{
+            user_id: userId,
+            activity_type: 'ACCOUNT_RESET',
+            content_title: 'Account History Wiped - Fresh Start Initiated',
+            module_id: 'SYSTEM',
+            topic_code: 'RESTART'
+        }]);
 
         return NextResponse.json({ success: true, message: 'History wiped successfully' });
     } catch (err: any) {

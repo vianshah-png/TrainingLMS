@@ -55,6 +55,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { syllabusData } from "@/data/syllabus";
 import AssetCentral from "@/components/admin/AssetCentral";
 import ContentArchitect from "@/components/admin/ContentArchitect";
+import { SELECTIVE_MODULES, SELECTIVE_MODULE_LABELS, FULL_ACCESS_ROLES } from "@/lib/moduleAccess";
 import QuizProtocolEditor from "@/components/admin/QuizProtocolEditor";
 
 
@@ -68,6 +69,7 @@ interface Profile {
     last_login?: string;
     temp_password?: string;
     phone?: string;
+    allowed_modules?: string[];
 }
 
 interface AssessmentRecord {
@@ -147,6 +149,7 @@ function AdminDashboardContent() {
         fullName: "",
         role: "counsellor",
         phone: "",
+        allowedModules: [] as string[],
         buddies: [{
             name: "BN Admin",
             email: "admin@balancenutrition.in",
@@ -200,9 +203,9 @@ function AdminDashboardContent() {
     const [isSavingQuiz, setIsSavingQuiz] = useState(false);
     const [quizSuccess, setQuizSuccess] = useState("");
     const [quizError, setQuizError] = useState("");
-    
-    const [emailModal, setEmailModal] = useState<{isOpen: boolean, to: string, userName: string} | null>(null);
-    const [emailForm, setEmailForm] = useState({subject: '', message: ''});
+
+    const [emailModal, setEmailModal] = useState<{ isOpen: boolean, to: string, userName: string } | null>(null);
+    const [emailForm, setEmailForm] = useState({ subject: '', message: '' });
     const [sendingEmail, setSendingEmail] = useState(false);
 
     // Dispatch & Danger Zone State
@@ -250,7 +253,7 @@ function AdminDashboardContent() {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
-            
+
             const res = await fetch('/api/admin/dashboard-sync', {
                 headers: { 'Authorization': `Bearer ${session.access_token}` }
             });
@@ -259,9 +262,9 @@ function AdminDashboardContent() {
                 console.error("Dashboard Sync failed:", res.status, errBody);
                 return;
             }
-            
+
             const syncData = await res.json();
-            
+
             const { data: fData } = await supabase.from('syllabus_folders').select('*').order('name', { ascending: true });
 
             setProfiles(syncData.profiles || []);
@@ -317,7 +320,10 @@ function AdminDashboardContent() {
                     fullName: newUser.fullName,
                     role: newUser.role,
                     phone: newUser.phone,
-                    trainingBuddy: buddyInfo
+                    trainingBuddy: buddyInfo,
+                    allowedModules: FULL_ACCESS_ROLES.includes(newUser.role)
+                        ? SELECTIVE_MODULES
+                        : newUser.allowedModules
                 }),
             });
 
@@ -327,6 +333,7 @@ function AdminDashboardContent() {
             setUserSuccess(data.message || `Authorized: ${newUser.email}. Account created.`);
             setNewUser({
                 email: "", password: "", fullName: "", role: "counsellor", phone: "",
+                allowedModules: [],
                 buddies: [{
                     name: "BN Admin",
                     email: "admin@balancenutrition.in",
@@ -448,12 +455,15 @@ function AdminDashboardContent() {
     const handleUpdateProfileDetails = async () => {
         if (!selectedProfile) return;
         try {
+            const modulesToSave = FULL_ACCESS_ROLES.includes(editRole)
+                ? SELECTIVE_MODULES
+                : (selectedProfile.allowed_modules || []);
             const { error } = await supabase
                 .from('profiles')
-                .update({ phone: editPhone, role: editRole })
+                .update({ phone: editPhone, role: editRole, allowed_modules: modulesToSave })
                 .eq('id', selectedProfile.id);
             if (error) throw error;
-            setSelectedProfile({ ...selectedProfile, phone: editPhone, role: editRole });
+            setSelectedProfile({ ...selectedProfile, phone: editPhone, role: editRole, allowed_modules: modulesToSave });
             setEditingProfile(false);
             alert("Profile updated successfully!");
             refreshData();
@@ -479,13 +489,14 @@ function AdminDashboardContent() {
         if (!confirm("⚠️ CAUTION: This will permanently delete all activity logs, quiz scores, progress, and audits for this user. Proceed?")) return;
         setResettingUser(true);
         try {
-            await Promise.all([
-                supabase.from('mentor_activity_logs').delete().eq('user_id', userId),
-                supabase.from('mentor_progress').delete().eq('user_id', userId),
-                supabase.from('assessment_logs').delete().eq('user_id', userId),
-                supabase.from('summary_audits').delete().eq('user_id', userId)
-            ]);
-            alert("Account history has been cleared.");
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch('/api/admin/users/reset-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+                body: JSON.stringify({ userId })
+            });
+            if (!res.ok) throw new DOMException("Failed to clear user history", "SecurityError");
+            alert("Account history has been cleared. The user is now starting fresh.");
             refreshData();
         } catch (err: any) {
             console.error("Reset Error:", err);
@@ -626,8 +637,8 @@ function AdminDashboardContent() {
             const res = await fetch('/api/admin/quiz', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-                body: JSON.stringify({ 
-                    topicCode: selectedQuizTopic, 
+                body: JSON.stringify({
+                    topicCode: selectedQuizTopic,
                     questions: manualQuizQuestions,
                     ai_guidance: customAIPrompt
                 })
@@ -672,9 +683,9 @@ function AdminDashboardContent() {
             });
             const data = await res.json();
             if (!res.ok) throw new DOMException(data.error || "Failed to send email", "NetworkError");
-            
+
             setEmailModal(null);
-            setEmailForm({subject: '', message: ''});
+            setEmailForm({ subject: '', message: '' });
             alert("Email sent successfully!");
         } catch (err: any) { alert(err.message); }
         finally { setSendingEmail(false); }
@@ -694,7 +705,7 @@ function AdminDashboardContent() {
             if (!res.ok) throw new DOMException("Failed to clear user history", "SecurityError");
             alert("User history cleared successfully!");
             refreshData();
-            setSelectedProfile(null); 
+            setSelectedProfile(null);
         } catch (err: any) { alert(err.message); }
         finally { setIsWipingUser(false); }
     };
@@ -702,7 +713,7 @@ function AdminDashboardContent() {
     const handleSendDispatch = async (method: 'dashboard' | 'email' | 'whatsapp' | 'all') => {
         if (!dispatchNotif.title || !dispatchNotif.message) return alert("Title and Message required");
         setSendingDispatch(true);
-        
+
         try {
             if (method === 'email' || method === 'all') {
                 const { data: { session } } = await supabase.auth.getSession();
@@ -724,8 +735,8 @@ function AdminDashboardContent() {
                 }
             }
             alert(`Dispatch delivered via ${method.toUpperCase()}`);
-            setDispatchNotif({title: '', message: '', type: 'info'});
-        } catch(err:any){ alert("Dispatch failed."); }
+            setDispatchNotif({ title: '', message: '', type: 'info' });
+        } catch (err: any) { alert("Dispatch failed."); }
         finally { setSendingDispatch(false); }
     };
 
@@ -771,23 +782,23 @@ function AdminDashboardContent() {
                                         <h3 className="text-3xl font-serif text-[#0E5858] mb-1">{selectedProfile.full_name}</h3>
                                         <p className="text-[10px] font-bold text-[#00B6C1] uppercase tracking-widest mb-5">{selectedProfile.email}</p>
                                         <div className="flex items-center justify-center gap-3">
-                                            <a 
-                                                href={`https://wa.me/${selectedProfile.phone?.replace(/\D/g, '') || ''}`} 
-                                                target="_blank" 
+                                            <a
+                                                href={`https://wa.me/${selectedProfile.phone?.replace(/\D/g, '') || ''}`}
+                                                target="_blank"
                                                 rel="noreferrer"
                                                 className="w-10 h-10 rounded-full bg-[#00B6C1] text-white flex items-center justify-center hover:brightness-110 transition-all shadow-md shadow-[#00B6C1]/30"
                                                 title="Call / WhatsApp"
                                             >
                                                 <Phone size={16} />
                                             </a>
-                                            <button 
+                                            <button
                                                 onClick={() => setEmailModal({ isOpen: true, to: selectedProfile.email, userName: selectedProfile.full_name || 'Member' })}
                                                 className="w-10 h-10 rounded-full bg-[#0E5858] text-white flex items-center justify-center hover:bg-[#00B6C1] transition-all shadow-md shadow-[#0E5858]/30"
                                                 title="Send Email"
                                             >
                                                 <Mail size={16} />
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     setEditPhone(selectedProfile.phone || '');
                                                     setEditRole(selectedProfile.role || 'counsellor');
@@ -1004,6 +1015,47 @@ function AdminDashboardContent() {
                                                         <option value="buddy">Training Buddy</option>
                                                     </select>
                                                 </div>
+
+                                                {/* Module Access Editor */}
+                                                <div>
+                                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Module Access</label>
+                                                    {FULL_ACCESS_ROLES.includes(editRole) ? (
+                                                        <div className="p-3 bg-green-50 border border-green-100 rounded-xl">
+                                                            <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">✓ Full Access — This role has all 5 modules</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            <p className="text-[8px] text-gray-400 font-medium">M1 & M2 included. Grant additional modules:</p>
+                                                            {SELECTIVE_MODULES.map(modId => {
+                                                                const currentModules = selectedProfile?.allowed_modules || [];
+                                                                const isGranted = currentModules.includes(modId);
+                                                                return (
+                                                                    <label
+                                                                        key={modId}
+                                                                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all text-[10px] font-bold ${isGranted
+                                                                                ? 'bg-[#0E5858] text-white border-[#0E5858]'
+                                                                                : 'bg-white text-[#0E5858] border-gray-200 hover:border-[#00B6C1]/30'
+                                                                            }`}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isGranted}
+                                                                            onChange={(e) => {
+                                                                                const updated = e.target.checked
+                                                                                    ? [...currentModules, modId]
+                                                                                    : currentModules.filter((m: string) => m !== modId);
+                                                                                setSelectedProfile({ ...selectedProfile!, allowed_modules: updated });
+                                                                            }}
+                                                                            className="w-3.5 h-3.5 accent-[#00B6C1] cursor-pointer"
+                                                                        />
+                                                                        {SELECTIVE_MODULE_LABELS[modId]}
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={handleUpdateProfileDetails}
@@ -1393,25 +1445,25 @@ function AdminDashboardContent() {
                                         className="w-full bg-gray-50 border border-gray-100 rounded-xl py-4 px-6 text-sm font-semibold focus:ring-2 focus:ring-[#00B6C1]/10 outline-none"
                                     />
                                 </div>
-                                
+
                                 <div className="md:col-span-2 space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
                                     <div className="flex justify-between items-center mb-2">
                                         <p className="text-[10px] font-black text-[#0E5858]/40 uppercase tracking-[0.2em]">Training Buddy Identities</p>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setNewUser({...newUser, buddies: [...newUser.buddies, { name: "", email: "", phone: "" }]})}
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewUser({ ...newUser, buddies: [...newUser.buddies, { name: "", email: "", phone: "" }] })}
                                             className="px-3 py-1.5 bg-[#00B6C1]/10 text-[#00B6C1] rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-[#00B6C1]/20 transition-colors"
                                         >
                                             + Add Another Buddy
                                         </button>
                                     </div>
-                                    
+
                                     {newUser.buddies.map((buddy, index) => (
                                         <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 relative group">
                                             {newUser.buddies.length > 1 && (
-                                                <button 
+                                                <button
                                                     type="button"
-                                                    onClick={() => setNewUser({...newUser, buddies: newUser.buddies.filter((_, i) => i !== index)})}
+                                                    onClick={() => setNewUser({ ...newUser, buddies: newUser.buddies.filter((_, i) => i !== index) })}
                                                     className="absolute -right-2 -top-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
                                                     <XCircle size={16} />
@@ -1462,6 +1514,44 @@ function AdminDashboardContent() {
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* Module Access Checkboxes — only shown for non-full-access roles */}
+                                {!FULL_ACCESS_ROLES.includes(newUser.role) && (
+                                    <div className="md:col-span-2 space-y-4 p-6 bg-[#FAFCEE] rounded-2xl border border-[#00B6C1]/10">
+                                        <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.2em] mb-3">Module Access Grants</p>
+                                        <p className="text-[9px] text-gray-400 font-medium mb-4">Modules 1 & 2 are available to all roles. Select additional modules below:</p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {SELECTIVE_MODULES.map(modId => (
+                                                <label
+                                                    key={modId}
+                                                    className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${newUser.allowedModules.includes(modId)
+                                                            ? 'bg-[#0E5858] text-white border-[#0E5858] shadow-lg'
+                                                            : 'bg-white text-[#0E5858] border-gray-100 hover:border-[#00B6C1]/30'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={newUser.allowedModules.includes(modId)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setNewUser({ ...newUser, allowedModules: [...newUser.allowedModules, modId] });
+                                                            } else {
+                                                                setNewUser({ ...newUser, allowedModules: newUser.allowedModules.filter(m => m !== modId) });
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 accent-[#00B6C1] cursor-pointer"
+                                                    />
+                                                    <span className="text-xs font-bold">{SELECTIVE_MODULE_LABELS[modId]}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {FULL_ACCESS_ROLES.includes(newUser.role) && (
+                                    <div className="md:col-span-2 p-4 bg-green-50 rounded-2xl border border-green-100">
+                                        <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">✓ Full Module Access — This role automatically grants access to all 5 modules.</p>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2">
                                     <label className="text-[9px] font-black text-[#0E5858]/50 uppercase tracking-[0.2em] ml-3">Temporary Password</label>
@@ -1681,16 +1771,16 @@ function AdminDashboardContent() {
                                                             <a href={`https://wa.me/${p.phone?.replace(/\D/g, '') || ''}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="w-8 h-8 rounded-lg bg-green-50 text-green-500 flex items-center justify-center hover:bg-green-100 transition-colors border border-green-100 shadow-sm">
                                                                 <Phone size={12} />
                                                             </a>
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setEmailModal({ isOpen: true, to: p.email, userName: p.full_name || 'Member' });
-                                                                }} 
+                                                                }}
                                                                 className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100 shadow-sm"
                                                             >
                                                                 <Mail size={12} />
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setSelectedProfile(p);
@@ -1715,32 +1805,134 @@ function AdminDashboardContent() {
 
             <AnimatePresence>
                 {selectedQuiz && (
-                    <div className="fixed inset-0 bg-[#0E5858]/80 backdrop-blur-md z-[100] flex items-center justify-center p-8">
+                    <div className="fixed inset-0 bg-[#0E5858]/80 backdrop-blur-md z-[100] flex items-center justify-center p-6 overflow-y-auto">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-[3rem] p-12 max-w-2xl w-full shadow-2xl relative overflow-hidden"
+                            className="bg-white rounded-[3rem] p-10 max-w-3xl w-full shadow-2xl relative my-auto"
                         >
                             <button onClick={() => setSelectedQuiz(null)} className="absolute top-8 right-8 text-gray-300 hover:text-[#0E5858] transition-all"><XCircle size={32} /></button>
-                            <div className="mb-10 text-center">
-                                <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-2">Assessment Results</p>
-                                <h3 className="text-3xl font-serif text-[#0E5858] mb-4">{selectedQuiz.topic_code}</h3>
-                                <div className="inline-block px-8 py-4 bg-[#FAFCEE] rounded-2xl">
-                                    <p className="text-5xl font-serif text-[#0E5858] mb-1">{Math.round((selectedQuiz.score / (selectedQuiz.total_questions || 5)) * 100)}%</p>
-                                    <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">Efficiency Rating</p>
-                                </div>
+
+                            {/* Header */}
+                            <div className="mb-8">
+                                <p className="text-[10px] font-black text-[#00B6C1] uppercase tracking-[0.3em] mb-1">Admin Quiz Review</p>
+                                <h3 className="text-3xl font-serif text-[#0E5858] mb-1">{selectedQuiz.topic_code}</h3>
+                                <p className="text-xs text-gray-400">{new Date(selectedQuiz.created_at).toLocaleString()}</p>
                             </div>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 scrollbar-hide">
-                                {selectedQuiz.raw_data?.questions?.map((q: any, i: number) => (
-                                    <div key={i} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                                        <p className="text-xs font-bold text-[#0E5858] mb-3">Q{i + 1}: {q.question}</p>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] font-black text-[#00B6C1] uppercase">Drafted:</span>
-                                            <span className="text-[11px] font-medium text-gray-500">{selectedQuiz.raw_data.answers[i]}</span>
-                                        </div>
-                                    </div>
-                                ))}
+
+                            {/* Score Strip */}
+                            <div className="flex items-center gap-6 p-5 bg-[#FAFCEE] rounded-2xl border border-[#0E5858]/5 mb-8">
+                                <div className="text-center">
+                                    <p className="text-4xl font-serif text-[#0E5858]">{Math.round((selectedQuiz.score / (selectedQuiz.total_questions || 5)) * 100)}%</p>
+                                    <p className="text-[8px] font-black text-[#00B6C1] uppercase tracking-widest">Score</p>
+                                </div>
+                                <div className="h-12 w-px bg-gray-100" />
+                                <div className="text-center">
+                                    <p className="text-2xl font-bold text-[#0E5858]">{selectedQuiz.score}/{selectedQuiz.total_questions || 5}</p>
+                                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Correct Answers</p>
+                                </div>
+                                <div className="flex-1" />
+                                <button
+                                    onClick={async () => {
+                                        // Recompute score from overrides and save
+                                        const results = selectedQuiz.raw_data?.gradedResults || [];
+                                        const overrides = selectedQuiz.admin_overrides || {};
+                                        const newScore = results.reduce((acc: number, _: any, i: number) => {
+                                            const wasCorrect = overrides[i] !== undefined ? overrides[i] : results[i]?.isCorrect;
+                                            return acc + (wasCorrect ? 1 : 0);
+                                        }, 0);
+                                        const { error } = await supabase
+                                            .from('assessment_logs')
+                                            .update({ score: newScore, admin_overrides: overrides })
+                                            .eq('id', selectedQuiz.id);
+                                        if (error) { alert('Save failed: ' + error.message); return; }
+                                        alert(`Overrides saved. New score: ${newScore}/${results.length}`);
+                                        refreshData();
+                                        setSelectedQuiz(null);
+                                    }}
+                                    className="px-6 py-3 bg-[#0E5858] text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#00B6C1] transition-all flex items-center gap-2"
+                                >
+                                    Save Overrides
+                                </button>
+                            </div>
+
+                            {/* Q&A Review List */}
+                            <div className="space-y-4 max-h-[460px] overflow-y-auto pr-2">
+                                {(() => {
+                                    const questions = selectedQuiz.raw_data?.questions || [];
+                                    const answers = selectedQuiz.raw_data?.answers || [];
+                                    const gradedResults = selectedQuiz.raw_data?.gradedResults || [];
+                                    const overrides = selectedQuiz.admin_overrides || {};
+
+                                    return questions.map((q: any, i: number) => {
+                                        const graded = gradedResults[i];
+                                        const adminOverride = overrides[i];
+                                        const displayCorrect = adminOverride !== undefined ? adminOverride : graded?.isCorrect;
+
+                                        return (
+                                            <div key={i} className={`p-5 rounded-2xl border-2 transition-all ${displayCorrect ? 'border-green-200 bg-green-50/40' : 'border-red-200 bg-red-50/40'}`}>
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-black text-[#0E5858] mb-3">Q{i + 1}. {q.question || q}</p>
+
+                                                        {/* User's answer */}
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 w-20 mt-0.5">User Said</span>
+                                                                <span className={`text-xs leading-relaxed font-medium ${displayCorrect ? 'text-green-700' : 'text-red-600'}`}>
+                                                                    {answers[i] || graded?.providedAnswer || '(No answer)'}
+                                                                </span>
+                                                            </div>
+                                                            {graded?.correctAnswer && (
+                                                                <div className="flex items-start gap-2">
+                                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 w-20 mt-0.5">Reference</span>
+                                                                    <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-md">
+                                                                        {graded.correctAnswer}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {graded?.aiFeedback && (
+                                                                <div className="flex items-start gap-2">
+                                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest shrink-0 w-20 mt-0.5">AI Note</span>
+                                                                    <span className="text-[11px] text-gray-500 italic">{graded.aiFeedback}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Admin Override Toggle */}
+                                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${displayCorrect ? 'text-green-600 bg-green-100' : 'text-red-500 bg-red-100'}`}>
+                                                            {displayCorrect ? '✓ Correct' : '✗ Wrong'}
+                                                        </span>
+                                                        <div className="flex gap-1.5">
+                                                            <button
+                                                                onClick={() => setSelectedQuiz((prev: any) => ({
+                                                                    ...prev,
+                                                                    admin_overrides: { ...(prev.admin_overrides || {}), [i]: true }
+                                                                }))}
+                                                                className={`w-7 h-7 rounded-lg text-[10px] font-black transition-all ${displayCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'}`}
+                                                                title="Mark as Correct"
+                                                            >✓</button>
+                                                            <button
+                                                                onClick={() => setSelectedQuiz((prev: any) => ({
+                                                                    ...prev,
+                                                                    admin_overrides: { ...(prev.admin_overrides || {}), [i]: false }
+                                                                }))}
+                                                                className={`w-7 h-7 rounded-lg text-[10px] font-black transition-all ${!displayCorrect ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-500'}`}
+                                                                title="Mark as Wrong"
+                                                            >✗</button>
+                                                        </div>
+                                                        {adminOverride !== undefined && (
+                                                            <span className="text-[7px] font-black text-[#00B6C1] uppercase tracking-widest">Overridden</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </motion.div>
                     </div>

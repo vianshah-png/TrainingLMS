@@ -16,7 +16,7 @@ export async function POST(req: Request) {
                 .eq('topic_code', topicCode)
                 .single();
 
-            if (manualQuiz && manualQuiz.questions && Array.isArray(manualQuiz.questions)) {
+            if (manualQuiz && manualQuiz.questions && Array.isArray(manualQuiz.questions) && manualQuiz.questions.length > 0) {
                 const testData = manualQuiz.questions;
                 const scoringKey = testData.map((q: any) => ({
                     question: q.question,

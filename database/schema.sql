@@ -3,11 +3,12 @@ CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT,
     full_name TEXT,
-    role TEXT DEFAULT 'counsellor',
+    role TEXT DEFAULT 'counsellor' CONSTRAINT profiles_role_check CHECK (role IN ('counsellor', 'nutripreneur', 'moderator', 'admin', 'tech', 'bd', 'cs', 'buddy', 'trainer buddy')),
     temp_password TEXT,
     training_buddy TEXT, -- JSON array of buddies
     phone TEXT, -- Admin-defined phone number
     avatar_url TEXT,
+    allowed_modules JSONB DEFAULT '[]'::jsonb, -- Admin-granted selective module access (e.g. ["module-3","module-4"])
     created_at TIMESTAMPTZ DEFAULT NOW(),
     last_login TIMESTAMPTZ
 );

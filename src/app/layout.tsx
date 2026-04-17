@@ -35,6 +35,7 @@ export default function RootLayout({
   const [userName, setUserName] = useState("Counsellor");
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("interviewee");
+  const [userAllowedModules, setUserAllowedModules] = useState<string[]>([]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -43,26 +44,34 @@ export default function RootLayout({
       if (session) {
         setIsAuthenticated(true);
         const name = session.user.user_metadata?.full_name || 'Counsellor';
-        const role = session.user.user_metadata?.role || 'interviewee';
         setUserName(name);
         setUserEmail(session.user.email || '');
-        setUserRole(role);
 
-        // Sync profile
+        // Fetch authoritative role & allowed_modules from profiles table
+        const { data: dbProfile } = await supabase
+          .from('profiles')
+          .select('role, allowed_modules')
+          .eq('id', session.user.id)
+          .single();
+
+        const role = dbProfile?.role || session.user.user_metadata?.role || 'interviewee';
+        setUserRole(role);
+        setUserAllowedModules(dbProfile?.allowed_modules || []);
+
+        // Sync profile (upsert name/email only — never overwrite role or allowed_modules)
         await supabase.from('profiles').upsert({
           id: session.user.id,
           email: session.user.email,
           full_name: name,
-          role: role
         });
 
         if (isLoginPage) {
-          if (role === 'admin') {
+          if (role === 'admin' || role === 'moderator') {
             router.push("/admin");
           } else {
             router.push("/");
           }
-        } else if (pathname.startsWith('/admin') && role !== 'admin') {
+        } else if (pathname.startsWith('/admin') && role !== 'admin' && role !== 'moderator') {
           // Access control: non-admins cannot access admin routes
           router.push("/");
         }

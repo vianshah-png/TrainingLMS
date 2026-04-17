@@ -6,10 +6,11 @@ import {
   Video, Trophy, ClipboardList, Phone, Flame, Baby, Stethoscope,
   Lightbulb, BookOpen, Mic, TrendingUp, Dumbbell
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { CLEAN_POSTS, CleanPost, ContentCategory } from "@/data/social_content_clean";
 import ContentCard from "@/components/ContentCard";
 import ContentModal from "@/components/ContentModal";
+import EducatorsTour from "@/components/EducatorsTour";
 
 // ── Health Filter Tabs — 8 official conditions + All ────────────────────────
 const HEALTH_CONDITIONS: { id: string; label: string; icon: React.ElementType; maps: string[] }[] = [
@@ -102,6 +103,16 @@ export default function EducatorsModulePage() {
   const [selectedPost, setSelectedPost] = useState<CleanPost | null>(null);
   const [clientPhone, setClientPhone] = useState("");
   const [tempPhone, setTempPhone] = useState("");
+  const [showTour, setShowTour] = useState(false);
+
+  // Check if educators tour should be shown
+  useEffect(() => {
+    const pending = localStorage.getItem('educators_tour_pending');
+    const completed = localStorage.getItem('educators_tour_completed');
+    if (pending && !completed) {
+      setShowTour(true);
+    }
+  }, []);
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -219,7 +230,7 @@ export default function EducatorsModulePage() {
           </p>
 
           {/* Search */}
-          <div className="relative group max-w-3xl mx-auto mb-6">
+          <div id="edu-tour-search" className="relative group max-w-3xl mx-auto mb-6">
             <div className="absolute inset-0 bg-[#00B6C1]/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="relative bg-white border border-[#0E5858]/10 rounded-[2.5rem] shadow-xl p-4 flex items-center gap-4">
               <div className="w-10 h-10 bg-[#FAFCEE] rounded-full flex items-center justify-center text-[#0E5858] shrink-0">
@@ -247,7 +258,7 @@ export default function EducatorsModulePage() {
           </div>
 
           {/* Health condition tabs */}
-          <div className="flex flex-wrap justify-center gap-2.5 mb-8">
+          <div id="edu-tour-health-tabs" className="flex flex-wrap justify-center gap-2.5 mb-8">
             {HEALTH_CONDITIONS.map((condition) => {
               const isActive = activeTab === condition.id;
               const Icon = condition.icon;
@@ -268,7 +279,7 @@ export default function EducatorsModulePage() {
           </div>
 
           {/* Client WhatsApp Number Input Bar */}
-          <div className="max-w-2xl mx-auto bg-white border border-[#0E5858]/10 rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-4 justify-center">
+          <div id="edu-tour-whatsapp" className="max-w-2xl mx-auto bg-white border border-[#0E5858]/10 rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-4 justify-center">
             <div className="flex items-center gap-2 text-[#0E5858] font-bold text-sm">
               <Phone size={16} className="text-[#00B6C1]" />
               Client WhatsApp Number:
@@ -299,7 +310,7 @@ export default function EducatorsModulePage() {
         </motion.header>
 
         {/* ── Kanban Board ──────────────────────────────────────────────── */}
-        <motion.div variants={itemVariants} className="flex-1 overflow-x-auto pb-8">
+        <motion.div variants={itemVariants} id="edu-tour-columns" className="flex-1 overflow-x-auto pb-8">
           <div className="flex gap-5 min-h-[600px] items-start w-max lg:w-full">
             {KANBAN_COLUMNS.map((col) => {
               const posts = getColumnPosts(col);
@@ -356,6 +367,11 @@ export default function EducatorsModulePage() {
           </div>
         </motion.div>
       </motion.main>
+
+      {/* ── Educators Walkthrough Tour ───────────────────────────────── */}
+      {showTour && (
+        <EducatorsTour onComplete={() => setShowTour(false)} />
+      )}
 
       {/* ── Content Modal ──────────────────────────────────────────────── */}
       {selectedPost && (
